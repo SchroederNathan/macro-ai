@@ -78,7 +78,7 @@ export function AnimatedInput({ onSend }: AnimatedInputProps) {
             onChangeText={setValue}
             placeholder="Message..."
             placeholderTextColor="#71717a"
-            selectionColor="#3b82f6"
+            selectionColor="#ff6900"
             className="flex-1 px-5 text-foreground text-base"
             style={{
               minHeight: MIN_INPUT_HEIGHT,

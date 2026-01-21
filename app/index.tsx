@@ -32,14 +32,15 @@ export default function ChatScreen() {
         <FlashList
           data={messages}
           renderItem={({ item }) => <MessageBubble message={item} />}
-          contentContainerStyle={{ paddingVertical: 16 }}
+          contentContainerClassName='py-4'
         />
+
+        {/* Input pinned to keyboard */}
+        <KeyboardStickyView>
+          <AnimatedInput onSend={handleSend} />
+        </KeyboardStickyView>
       </Pressable>
 
-      {/* Input pinned to keyboard */}
-      <KeyboardStickyView>
-        <AnimatedInput onSend={handleSend} />
-      </KeyboardStickyView>
     </View>
   )
 }
