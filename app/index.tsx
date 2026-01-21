@@ -24,15 +24,8 @@ export default function ChatScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background">
-      {/* Header */}
-      <Pressable
-        className="px-4 pt-2 pb-3 border-b border-border"
-        style={{ paddingTop: insets.top }}
-        onPress={Keyboard.dismiss}
-      >
-        <Text className="text-xl font-semibold text-foreground text-center">Chat</Text>
-      </Pressable>
+    <View className={`flex-1 bg-background pt-safe`}>
+
 
       {/* Messages - tap to dismiss keyboard */}
       <Pressable className="flex-1" onPress={Keyboard.dismiss}>

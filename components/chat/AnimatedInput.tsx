@@ -97,13 +97,13 @@ export function AnimatedInput({ onSend }: AnimatedInputProps) {
         >
           <Pressable
             onPress={value.trim() ? handleSend : undefined}
-            className={`w-10 h-10 rounded-full items-center justify-center bg-primary`}
+            className={`w-10 h-10 rounded-full items-center justify-center bg-primary ring-1 ring-primary-border`}
             style={{ borderCurve: 'continuous' }}
           >
             {value.trim() ? (
-              <ArrowUp size={16} color="white" />
+              <ArrowUp size={16} color="white" strokeWidth={3} />
             ) : (
-              <Mic size={16} color="white" />
+              <Mic size={16} color="white" strokeWidth={3} />
             )}
           </Pressable>
         </View>

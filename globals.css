@@ -2,31 +2,33 @@
 @import 'uniwind';
 
 @layer theme {
-  :root {
-    @variant dark {
-      --color-background: oklch(14.5% 0 0);
-      --color-foreground: oklch(98.5% 0 0);
-      --color-primary: oklch(70.5% 0.213 47.604);
-      --color-muted: oklch(44.4% 0.011 73.639);
-      --color-chat: oklch(20.5% 0 0);
-      --color-muted-foreground: oklch(26.9% 0 0);
-      --color-card: #18181b;
-      --color-border: oklch(26.9% 0 0);
-      --color-user-bubble: #3b82f6;
-      --color-ai-bubble: #27272a;
-    }
+    :root {
+        @variant dark {
+            --color-background: oklch(14.5% 0 0);
+            --color-foreground: oklch(98.5% 0 0);
+            --color-primary: oklch(70.5% 0.213 47.604);
+            --color-primary-border: oklch(75% 0.183 55.934);
+            --color-muted: oklch(44.4% 0.011 73.639);
+            --color-chat: oklch(20.5% 0 0);
+            --color-muted-foreground: oklch(26.9% 0 0);
+            --color-card: oklch(18.5% 0 0);
+            --color-border: oklch(26.9% 0 0);
+            --color-user-bubble: oklch(55.3% 0.195 38.402);
 
-    @variant light {
-      --color-background: #fafafa;
-      --color-foreground: #0a0a0a;
-      --color-primary: #2563eb;
-      --color-muted: #f4f4f5;
-      --color-chat: oklch(94.5% 0 0);
-      --color-muted-foreground: #71717a;
-      --color-card: #ffffff;
-      --color-border: #e4e4e7;
-      --color-user-bubble: #2563eb;
-      --color-ai-bubble: #f4f4f5;
+        }
+
+        @variant light {
+            --color-background: #fafafa;
+            --color-foreground: #0a0a0a;
+            --color-primary: #2563eb;
+            --color-primary-border: oklch(75% 0.183 55.934);
+
+            --color-muted: #f4f4f5;
+            --color-chat: oklch(94.5% 0 0);
+            --color-muted-foreground: #71717a;
+            --color-card: #ffffff;
+            --color-border: #e4e4e7;
+            --color-user-bubble: #2563eb;
+        }
     }
-  }
 }
