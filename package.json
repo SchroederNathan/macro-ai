@@ -1,0 +1,18 @@
+{
+  "name": "macro-ai",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "55.0.0-canary-20260120-bb71700",
+    "expo-status-bar": "3.0.10-canary-20260120-bb71700",
+    "react": "19.2.0",
+    "react-native": "0.83.1"
+  },
+  "private": true
+}
