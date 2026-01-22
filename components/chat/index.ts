@@ -1,2 +1,3 @@
 export { MessageBubble } from './MessageBubble'
-export { AnimatedInput } from './AnimatedInput'
+export { AnimatedInput, type AnimatedInputProps } from './AnimatedInput'
+export { MIN_INPUT_HEIGHT } from './AnimatedInput'

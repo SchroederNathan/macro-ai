@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Keyboard, Platform, Pressable, TextInput, View } from 'react-native'
+import { Keyboard, Platform, Pressable, TextInput, type TextInputProps, View } from 'react-native'
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -10,15 +10,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ArrowUp, Mic } from 'lucide-react-native'
 
-const MIN_INPUT_HEIGHT = 56
+export const MIN_INPUT_HEIGHT = 56
 const MAX_INPUT_HEIGHT = 112
 
-type AnimatedInputProps = {
+export type AnimatedInputProps = TextInputProps & {
   onSend: (text: string) => void
 }
 
-export function AnimatedInput({ onSend }: AnimatedInputProps) {
+export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textInputProps }: AnimatedInputProps) {
   const [value, setValue] = useState('')
+  const isControlled = valueProp !== undefined
+  const inputValue = isControlled ? String(valueProp) : value
   const [isFocused, setIsFocused] = useState(false)
   const textInputRef = useRef<TextInput>(null)
   const insets = useSafeAreaInsets()
@@ -44,9 +46,10 @@ export function AnimatedInput({ onSend }: AnimatedInputProps) {
   })
 
   const handleSend = () => {
-    if (!value.trim()) return
-    onSend(value.trim())
-    setValue('')
+    if (!inputValue.trim()) return
+    onSend(inputValue.trim())
+    onChangeText?.('')
+    if (!isControlled) setValue('')
     textInputRef.current?.blur()
     setIsFocused(false)
     focusProgress.set(withSpring(0))
@@ -63,7 +66,7 @@ export function AnimatedInput({ onSend }: AnimatedInputProps) {
   }
 
   return (
-    <Animated.View style={rRootContainerStyle} className="mx-3 mt-auto">
+    <Animated.View style={rRootContainerStyle} className="mx-3 mt-auto ">
       <Animated.View
         style={[
           { borderCurve: 'continuous', borderRadius: MIN_INPUT_HEIGHT / 2 },
@@ -74,8 +77,11 @@ export function AnimatedInput({ onSend }: AnimatedInputProps) {
         <View className="flex-row items-center">
           <TextInput
             ref={textInputRef}
-            value={value}
-            onChangeText={setValue}
+            value={inputValue}
+            onChangeText={(text) => {
+              onChangeText?.(text)
+              if (!isControlled) setValue(text)
+            }}
             placeholder="Message..."
             placeholderTextColor="#71717a"
             selectionColor="#ff6900"
@@ -88,6 +94,7 @@ export function AnimatedInput({ onSend }: AnimatedInputProps) {
             multiline
             onFocus={handleFocus}
             onBlur={handleBlur}
+            {...textInputProps}
           />
         </View>
 
@@ -96,11 +103,11 @@ export function AnimatedInput({ onSend }: AnimatedInputProps) {
           style={{ height: MIN_INPUT_HEIGHT }}
         >
           <Pressable
-            onPress={value.trim() ? handleSend : undefined}
+            onPress={inputValue.trim() ? handleSend : undefined}
             className={`w-10 h-10 rounded-full items-center justify-center bg-primary ring-1 ring-primary-border`}
             style={{ borderCurve: 'continuous' }}
           >
-            {value.trim() ? (
+            {inputValue.trim() ? (
               <ArrowUp size={16} color="white" strokeWidth={3} />
             ) : (
               <Mic size={16} color="white" strokeWidth={3} />

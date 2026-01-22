@@ -7,6 +7,8 @@ import '../globals.css'
 import { SafeAreaListener } from 'react-native-safe-area-context'
 import { Uniwind } from 'uniwind'
 
+import '@/polyfills';
+
 export default function Layout() {
   const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme())
 

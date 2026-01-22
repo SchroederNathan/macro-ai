@@ -1,46 +1,50 @@
-import { useState } from 'react'
-import { View, Text, Pressable, Keyboard } from 'react-native'
+import { AnimatedInput, MessageBubble, MIN_INPUT_HEIGHT } from '@/components/chat'
+import { generateAPIUrl } from '@/utils'
+import { useChat } from '@ai-sdk/react'
 import { FlashList } from '@shopify/flash-list'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { DefaultChatTransport } from 'ai'
+import { fetch as expoFetch } from 'expo/fetch'
+import { useState } from 'react'
+import { Keyboard, Pressable, Text, View } from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
-import { MessageBubble, AnimatedInput } from '@/components/chat'
-import type { Message } from '@/types/chat'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 export default function ChatScreen() {
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', content: 'Hello! How can I help you today?', role: 'assistant', timestamp: new Date() }
-  ])
+
+  const [input, setInput] = useState('')
+
+
+  const { messages, error, sendMessage } = useChat({
+    transport: new DefaultChatTransport({
+      fetch: expoFetch as unknown as typeof globalThis.fetch,
+      api: generateAPIUrl('/api/chat'),
+    }),
+    onError: error => console.error(error, 'ERROR'),
+  });
+
+  if (error) return <Text>{error.message}</Text>;
+
   const insets = useSafeAreaInsets()
-
-  const handleSend = (text: string) => {
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: text,
-      role: 'user',
-      timestamp: new Date(),
-    }
-    setMessages(prev => [...prev, userMessage])
-    // TODO: Add AI response logic here
-  }
-
+  
   return (
-    <View className={`flex-1 bg-background pt-safe`}>
-
-
+    <View className="flex-1 bg-background pt-safe">
       {/* Messages - tap to dismiss keyboard */}
       <Pressable className="flex-1" onPress={Keyboard.dismiss}>
         <FlashList
           data={messages}
           renderItem={({ item }) => <MessageBubble message={item} />}
-          contentContainerClassName='py-4'
+          className="flex-1"
+          contentContainerClassName="py-4"
+          contentContainerStyle={{
+            paddingBottom: MIN_INPUT_HEIGHT + insets.bottom + 12,
+          }}
         />
-
-        {/* Input pinned to keyboard */}
-        <KeyboardStickyView>
-          <AnimatedInput onSend={handleSend} />
-        </KeyboardStickyView>
       </Pressable>
 
+      {/* Input pinned to keyboard */}
+      <KeyboardStickyView>
+        <AnimatedInput value={input} onChangeText={setInput} onSend={() => sendMessage({ text: input })} />
+      </KeyboardStickyView>
     </View>
   )
 }

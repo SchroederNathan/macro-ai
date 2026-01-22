@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'uniwind';
 
+/* Colors are synced with constants/colors.ts */
 @layer theme {
     :root {
         @variant dark {
@@ -22,9 +23,8 @@
             --color-foreground: #0a0a0a;
             --color-primary: #2563eb;
             --color-primary-border: oklch(75% 0.183 55.934);
-
+            --color-chat: #f0f0f0;
             --color-muted: #f4f4f5;
-            --color-chat: oklch(94.5% 0 0);
             --color-muted-foreground: #71717a;
             --color-card: #ffffff;
             --color-border: #e4e4e7;

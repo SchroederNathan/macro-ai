@@ -1,23 +1,45 @@
-import type { Message } from '@/types/chat'
-import { Text, View } from 'react-native'
+import type { UIMessage } from 'ai'
+import { useCallback } from 'react'
+import { Text, View, Linking } from 'react-native'
+import { EnrichedMarkdownText } from 'react-native-enriched-markdown'
+import { useMarkdownStyle } from './useMarkdownStyle'
 
 type MessageBubbleProps = {
-  message: Message
+  message: UIMessage
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+  const markdownStyle = useMarkdownStyle()
+
+  const handleLinkPress = useCallback((url: string) => {
+    Linking.openURL(url)
+  }, [])
+console.log(message.parts)
 
   return (
-    <View className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} px-4 py-1`}>
+    <View className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} px-4 py-1`} id={message.id}>
       <View
-        className={`max-w-[80%] px-4 py-3 rounded-3xl ${isUser && 'bg-user-bubble'
+        className={`${isUser ? 'max-w-[80%]' : 'max-w-full'} px-4 py-3 rounded-3xl ${isUser && 'bg-user-bubble'
           }`}
         style={{ borderCurve: 'continuous' }}
       >
-        <Text className={isUser ? 'text-white' : 'text-foreground'}>
-          {message.content}
-        </Text>
+        {message.parts.map((part, i) => {
+          switch (part.type) {
+            case 'text':
+              if (isUser) {
+                return <Text className="text-white text-base" key={`${message.id}-${i}`}>{part.text}</Text>
+              }
+              return (
+                <EnrichedMarkdownText
+                  key={`${message.id}-${i}`}
+                  markdown={part.text}
+                  markdownStyle={markdownStyle}
+                  onLinkPress={(event) => handleLinkPress(event.url)}
+                />
+              )
+          }
+        })}
       </View>
     </View>
   )
