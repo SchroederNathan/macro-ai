@@ -1,5 +1,6 @@
+import { GlassView } from 'expo-glass-effect'
 import { useRef, useState } from 'react'
-import { Platform, Pressable, TextInput, type TextInputProps, View } from 'react-native'
+import { Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -9,6 +10,8 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ArrowUp, Mic } from 'lucide-react-native'
+
+const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
 
 export const MIN_INPUT_HEIGHT = 56
 const MAX_INPUT_HEIGHT = 112
@@ -24,6 +27,12 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
 
   const textInputRef = useRef<TextInput>(null)
   const insets = useSafeAreaInsets()
+  const colorScheme = useColorScheme()
+  const isDark = colorScheme === 'dark'
+
+  // Tint colors for glass effect
+  const containerTint = isDark ? '#27272a' : '#f4f4f5'
+  const buttonTint = isDark ? '#ff6900' : '#2563eb'
 
   const focusProgress = useSharedValue(0)
 
@@ -66,14 +75,15 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
   }
 
   return (
-    <Animated.View style={rRootContainerStyle} className="mx-3 mt-auto ">
-      <Animated.View
-        style={[
-          { borderCurve: 'continuous', borderRadius: MIN_INPUT_HEIGHT / 2 },
-          rInputContainerStyle,
-        ]}
-        className="bg-chat border border-border"
-      >
+    <Animated.View style={rRootContainerStyle} className="mx-3 mt-auto">
+      <Pressable onPress={() => textInputRef.current?.focus()}>
+        <AnimatedGlassView
+          style={[
+            { borderCurve: 'continuous', borderRadius: MIN_INPUT_HEIGHT / 2 },
+            rInputContainerStyle,
+          ]}
+          isInteractive
+        >
         <View className="flex-row items-center">
           <TextInput
             ref={textInputRef}
@@ -102,19 +112,30 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
           className="absolute bottom-0 left-0 right-0 flex-row items-center justify-end px-2"
           style={{ height: MIN_INPUT_HEIGHT }}
         >
-          <Pressable
-            onPress={inputValue.trim() ? handleSend : undefined}
-            className={`w-10 h-10 rounded-full items-center justify-center bg-primary ring-1 ring-primary-border`}
-            style={{ borderCurve: 'continuous' }}
-          >
-            {inputValue.trim() ? (
-              <ArrowUp size={16} color="white" strokeWidth={3} />
-            ) : (
-              <Mic size={16} color="white" strokeWidth={3} />
-            )}
+          <Pressable onPress={inputValue.trim() ? handleSend : undefined}>
+            <GlassView
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                borderCurve: 'continuous',
+
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              tintColor={buttonTint}
+              isInteractive
+            >
+              {inputValue.trim() ? (
+                <ArrowUp size={16} color="white" strokeWidth={3} />
+              ) : (
+                <Mic size={16} color="white" strokeWidth={3} />
+              )}
+            </GlassView>
           </Pressable>
         </View>
-      </Animated.View>
+        </AnimatedGlassView>
+      </Pressable>
     </Animated.View>
   )
 }
