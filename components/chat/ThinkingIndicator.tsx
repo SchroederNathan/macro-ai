@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Text, useColorScheme, View } from 'react-native'
 import { ShimmerText } from './ShimmerText'
 
 type ThinkingIndicatorProps = {
   isThinking: boolean
+  startTime?: number | null
 }
 
 function formatDuration(seconds: number): string {
@@ -18,28 +19,24 @@ function formatDuration(seconds: number): string {
   return `${minutes}m ${remainingSeconds}s`
 }
 
-export function ThinkingIndicator({ isThinking }: ThinkingIndicatorProps) {
+export function ThinkingIndicator({ isThinking, startTime }: ThinkingIndicatorProps) {
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
 
-  const startTimeRef = useRef<number | null>(null)
   const [thinkingDuration, setThinkingDuration] = useState<number | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
 
   useEffect(() => {
     if (isThinking) {
-      // Start thinking
-      startTimeRef.current = Date.now()
       setThinkingDuration(null)
       setShowCompleted(false)
-    } else if (startTimeRef.current !== null) {
-      // Finished thinking
-      const duration = (Date.now() - startTimeRef.current) / 1000
+    } else if (startTime) {
+      // Finished thinking - calculate duration from passed startTime
+      const duration = (Date.now() - startTime) / 1000
       setThinkingDuration(duration)
       setShowCompleted(true)
-      startTimeRef.current = null
     }
-  }, [isThinking])
+  }, [isThinking, startTime])
 
   if (!isThinking && !showCompleted) {
     return null
@@ -50,13 +47,13 @@ export function ThinkingIndicator({ isThinking }: ThinkingIndicatorProps) {
       <View className="py-3 flex-row items-center">
         {isThinking ? (
           <ShimmerText
-            className="text-base text-muted-foreground"
+            className="text-base text-muted"
             highlightColor={isDark ? '#fafafa' : '#0a0a0a'}
           >
             Thinking...
           </ShimmerText>
         ) : (
-          <Text className="text-base text-muted-foreground">
+          <Text className="text-base text-muted">
             Thought for {formatDuration(thinkingDuration ?? 0)}
           </Text>
         )}

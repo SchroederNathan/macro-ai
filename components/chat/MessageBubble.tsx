@@ -8,9 +8,10 @@ import { useMarkdownStyle } from './useMarkdownStyle'
 type MessageBubbleProps = {
   message: UIMessage
   isThinking?: boolean
+  thinkingStartTime?: number | null
 }
 
-export function MessageBubble({ message, isThinking = false }: MessageBubbleProps) {
+export function MessageBubble({ message, isThinking = false, thinkingStartTime }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
   const markdownStyle = useMarkdownStyle()
@@ -27,7 +28,7 @@ export function MessageBubble({ message, isThinking = false }: MessageBubbleProp
       >
         {/* Show thinking indicator as header for assistant messages */}
         {isAssistant && (
-          <ThinkingIndicator isThinking={isThinking} />
+          <ThinkingIndicator isThinking={isThinking} startTime={thinkingStartTime} />
         )}
 
         {message.parts.map((part, i) => {

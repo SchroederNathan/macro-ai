@@ -13,6 +13,7 @@ export default function ChatScreen() {
 
   const [input, setInput] = useState('')
   const [isThinking, setIsThinking] = useState(false)
+  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
   const prevMessageCountRef = useRef(0)
 
   const { messages, error, sendMessage } = useChat({
@@ -42,6 +43,7 @@ export default function ChatScreen() {
   const handleSend = () => {
     if (!input.trim()) return
     setIsThinking(true)
+    setThinkingStartTime(Date.now())
     sendMessage({ text: input })
   }
 
@@ -62,6 +64,7 @@ export default function ChatScreen() {
             <MessageBubble
               message={item}
               isThinking={isThinking && index === messages.length - 1}
+              thinkingStartTime={thinkingStartTime}
             />
           )}
           className="flex-1"
@@ -73,7 +76,7 @@ export default function ChatScreen() {
             needsStandaloneThinking ? (
               <View className="px-4 py-1">
                 <View className="px-4 py-3">
-                  <ThinkingIndicator isThinking={true} />
+                  <ThinkingIndicator isThinking={true} startTime={thinkingStartTime} />
                 </View>
               </View>
             ) : null
