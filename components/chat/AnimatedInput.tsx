@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Keyboard, Platform, Pressable, TextInput, type TextInputProps, View } from 'react-native'
+import { Platform, Pressable, TextInput, type TextInputProps, View } from 'react-native'
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -21,7 +21,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
   const [value, setValue] = useState('')
   const isControlled = valueProp !== undefined
   const inputValue = isControlled ? String(valueProp) : value
-  const [isFocused, setIsFocused] = useState(false)
+
   const textInputRef = useRef<TextInput>(null)
   const insets = useSafeAreaInsets()
 
@@ -51,17 +51,17 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
     onChangeText?.('')
     if (!isControlled) setValue('')
     textInputRef.current?.blur()
-    setIsFocused(false)
+
     focusProgress.set(withSpring(0))
   }
 
   const handleFocus = () => {
-    setIsFocused(true)
+
     focusProgress.set(withSpring(1))
   }
 
   const handleBlur = () => {
-    setIsFocused(false)
+
     focusProgress.set(withSpring(0))
   }
 

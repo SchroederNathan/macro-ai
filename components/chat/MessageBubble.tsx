@@ -1,29 +1,35 @@
 import type { UIMessage } from 'ai'
 import { useCallback } from 'react'
-import { Text, View, Linking } from 'react-native'
+import { Linking, Text, View } from 'react-native'
 import { EnrichedMarkdownText } from 'react-native-enriched-markdown'
+import { ThinkingIndicator } from './ThinkingIndicator'
 import { useMarkdownStyle } from './useMarkdownStyle'
 
 type MessageBubbleProps = {
   message: UIMessage
+  isThinking?: boolean
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, isThinking = false }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+  const isAssistant = message.role === 'assistant'
   const markdownStyle = useMarkdownStyle()
 
   const handleLinkPress = useCallback((url: string) => {
     Linking.openURL(url)
   }, [])
-console.log(message.parts)
 
   return (
     <View className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} px-4 py-1`} id={message.id}>
       <View
-        className={`${isUser ? 'max-w-[80%]' : 'max-w-full'} px-4 py-3 rounded-3xl ${isUser && 'bg-user-bubble'
-          }`}
+        className={`${isUser ? 'max-w-[80%]' : 'max-w-full'} px-4 py-3 rounded-3xl ${isUser && 'bg-user-bubble'}`}
         style={{ borderCurve: 'continuous' }}
       >
+        {/* Show thinking indicator as header for assistant messages */}
+        {isAssistant && (
+          <ThinkingIndicator isThinking={isThinking} />
+        )}
+
         {message.parts.map((part, i) => {
           switch (part.type) {
             case 'text':
