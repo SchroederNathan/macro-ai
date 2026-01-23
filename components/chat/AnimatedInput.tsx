@@ -1,6 +1,7 @@
 import { GlassView } from 'expo-glass-effect'
 import { useRef, useState } from 'react'
 import { Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
+import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -8,9 +9,10 @@ import Animated, {
   withSpring
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Haptics } from 'react-native-nitro-haptics';
 
+import { LinearGradient } from 'expo-linear-gradient'
 import { ArrowUp, Mic } from 'lucide-react-native'
+import { colors } from '@/constants/colors'
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
 
@@ -77,7 +79,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
 
   return (
     <Animated.View style={rRootContainerStyle} className="mx-3 mt-auto">
-      <Pressable onPress={() => textInputRef.current?.focus()}>
+      <Pressable className='z-10' onPress={() => textInputRef.current?.focus()}>
         <AnimatedGlassView
           style={[
             { borderCurve: 'continuous', borderRadius: MIN_INPUT_HEIGHT / 2 },
@@ -85,61 +87,69 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
           ]}
           isInteractive
         >
-        <View className="flex-row items-center">
-          <TextInput
-            ref={textInputRef}
-            value={inputValue}
-            onChangeText={(text) => {
-              onChangeText?.(text)
-              if (!isControlled) setValue(text)
-            }}
-            placeholder="Message..."
-            placeholderTextColor="#71717a"
-            selectionColor="#ff6900"
-            className="flex-1 px-5 text-foreground text-base"
-            style={{
-              minHeight: MIN_INPUT_HEIGHT,
-              paddingTop: Platform.OS === 'ios' ? 12 : 16,
-              paddingBottom: Platform.OS === 'ios' ? 18 : 16,
-            }}
-            multiline
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            {...textInputProps}
-          />
-        </View>
-
-        <View
-          className="absolute bottom-0 left-0 right-0 flex-row items-center justify-end px-2"
-          style={{ height: MIN_INPUT_HEIGHT }}
-        >
-          <Pressable onPress={() => { 
-            Haptics.selection();
-            if (inputValue.trim()) handleSend() 
-            }}>
-            <GlassView
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                borderCurve: 'continuous',
-
-                alignItems: 'center',
-                justifyContent: 'center',
+          <View className="flex-row items-center">
+            <TextInput
+              ref={textInputRef}
+              value={inputValue}
+              onChangeText={(text) => {
+                onChangeText?.(text)
+                if (!isControlled) setValue(text)
               }}
-              tintColor={buttonTint}
-              isInteractive
-            >
-              {inputValue.trim() ? (
-                <ArrowUp size={16} color="white" strokeWidth={3} />
-              ) : (
-                <Mic size={16} color="white" strokeWidth={3} />
-              )}
-            </GlassView>
-          </Pressable>
-        </View>
+              placeholder="Message..."
+              placeholderTextColor="#71717a"
+              selectionColor="#ff6900"
+              className="flex-1 px-5 text-foreground text-base"
+              style={{
+                minHeight: MIN_INPUT_HEIGHT,
+                paddingTop: Platform.OS === 'ios' ? 12 : 16,
+                paddingBottom: Platform.OS === 'ios' ? 18 : 16,
+              }}
+              multiline
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              {...textInputProps}
+            />
+          </View>
+
+          <View
+            className="absolute bottom-0 left-0 right-0 flex-row items-center justify-end px-2"
+            style={{ height: MIN_INPUT_HEIGHT }}
+          >
+            <Pressable onPress={() => {
+              Haptics.selection();
+              if (inputValue.trim()) handleSend()
+            }}>
+              <GlassView
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  borderCurve: 'continuous',
+
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                tintColor={buttonTint}
+                isInteractive
+              >
+                {inputValue.trim() ? (
+                  <ArrowUp size={16} color="white" strokeWidth={3} />
+                ) : (
+                  <Mic size={16} color="white" strokeWidth={3} />
+                )}
+              </GlassView>
+            </Pressable>
+          </View>
         </AnimatedGlassView>
       </Pressable>
+      <LinearGradient
+        colors={[
+          isDark ? colors.dark.background + '00' : colors.light.background + '00',
+          isDark ? colors.dark.background : colors.light.background
+        ]}
+
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, zIndex: 0 }}
+      />
     </Animated.View>
   )
 }

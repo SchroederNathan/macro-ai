@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Keyboard, Pressable, Text, View } from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useHeaderHeight } from '@react-navigation/elements';
 
 export default function ChatScreen() {
 
@@ -15,7 +16,7 @@ export default function ChatScreen() {
   const [isThinking, setIsThinking] = useState(false)
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
   const prevMessageCountRef = useRef(0)
-
+  const headerHeight = useHeaderHeight();
   const { messages, error, sendMessage } = useChat({
     transport: new DefaultChatTransport({
       fetch: expoFetch as unknown as typeof globalThis.fetch,
@@ -55,11 +56,12 @@ export default function ChatScreen() {
   const needsStandaloneThinking = isThinking && (!lastMessage || lastMessage.role === 'user')
 
   return (
-    <View className="flex-1 bg-background pt-safe">
+    <View className="flex-1 bg-background">
       {/* Messages - tap to dismiss keyboard */}
-      <Pressable className="flex-1" onPress={Keyboard.dismiss}>
+      <Pressable className="absolute inset-0" onPress={Keyboard.dismiss}>
         <FlashList
           data={messages}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item, index }) => (
             <MessageBubble
               message={item}
@@ -67,9 +69,8 @@ export default function ChatScreen() {
               thinkingStartTime={thinkingStartTime}
             />
           )}
-          className="flex-1"
-          contentContainerClassName="py-4"
           contentContainerStyle={{
+            paddingTop: headerHeight + 8,
             paddingBottom: MIN_INPUT_HEIGHT + insets.bottom + 12,
           }}
           ListFooterComponent={
@@ -84,8 +85,8 @@ export default function ChatScreen() {
         />
       </Pressable>
 
-      {/* Input pinned to keyboard */}
-      <KeyboardStickyView>
+      {/* Input pinned to keyboard - positioned over content */}
+      <KeyboardStickyView style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
         <AnimatedInput value={input} onChangeText={setInput} onSend={handleSend} />
       </KeyboardStickyView>
     </View>
