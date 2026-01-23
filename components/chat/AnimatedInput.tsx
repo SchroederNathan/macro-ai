@@ -11,8 +11,16 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { colors } from '@/constants/colors'
+import { StaggeredText } from '@/components/ui/StaggeredText'
 import { LinearGradient } from 'expo-linear-gradient'
 import { ArrowUp, Camera, Mic, ScanBarcode } from 'lucide-react-native'
+
+const PLACEHOLDER_PHRASES = [
+  'Ask me anything...',
+  'What can I help with?',
+  'Start a conversation...',
+  'Type your message...',
+]
 
 const BUTTON_SIZE = 40
 
@@ -23,9 +31,10 @@ const MAX_INPUT_HEIGHT = 112
 
 export type AnimatedInputProps = TextInputProps & {
   onSend: (text: string) => void
+  hasMessages?: boolean
 }
 
-export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textInputProps }: AnimatedInputProps) {
+export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessages = false, ...textInputProps }: AnimatedInputProps) {
   const [value, setValue] = useState('')
   const isControlled = valueProp !== undefined
   const inputValue = isControlled ? String(valueProp) : value
@@ -34,6 +43,9 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
   const insets = useSafeAreaInsets()
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
+
+  // Show animated placeholder when no text and no previous messages
+  const showAnimatedPlaceholder = !inputValue.trim() && !hasMessages
 
   // Tint colors for glass effect
   const containerTint = isDark ? '#27272a' : '#f4f4f5'
@@ -126,13 +138,13 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
                 onChangeText?.(text)
                 if (!isControlled) setValue(text)
               }}
-              placeholder="Message..."
+              placeholder={showAnimatedPlaceholder ? '' : 'Message...'}
               placeholderTextColor="#71717a"
               selectionColor="#ff6900"
               className="flex-1 px-5 text-foreground text-base"
               style={{
                 minHeight: MIN_INPUT_HEIGHT,
-                paddingTop: Platform.OS === 'ios' ? 12 : 16,
+                paddingTop: Platform.OS === 'ios' ? 14 : 16,
                 paddingBottom: Platform.OS === 'ios' ? 18 : 16,
               }}
               multiline
@@ -140,6 +152,20 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
               onBlur={handleBlur}
               {...textInputProps}
             />
+            {showAnimatedPlaceholder && (
+              <View
+                pointerEvents="none"
+                className="absolute left-5"
+                style={{ top: Platform.OS === 'ios' ? 16 : 16 }}
+              >
+                <StaggeredText
+                  phrases={PLACEHOLDER_PHRASES}
+                  visible={showAnimatedPlaceholder}
+                  intervalMs={3500}
+                  className="text-base text-zinc-500"
+                />
+              </View>
+            )}
           </View>
 
           <View

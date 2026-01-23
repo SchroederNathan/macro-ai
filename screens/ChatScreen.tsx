@@ -87,7 +87,7 @@ export default function ChatScreen() {
 
       {/* Input pinned to keyboard - positioned over content */}
       <KeyboardStickyView style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
-        <AnimatedInput value={input} onChangeText={setInput} onSend={handleSend} />
+        <AnimatedInput value={input} onChangeText={setInput} onSend={handleSend} hasMessages={messages.length > 0} />
       </KeyboardStickyView>
     </View>
   )
