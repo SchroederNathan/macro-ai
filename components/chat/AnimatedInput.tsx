@@ -4,22 +4,23 @@ import { Platform, Pressable, TextInput, type TextInputProps, useColorScheme, Vi
 import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
   interpolate,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withSpring
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { colors } from '@/constants/colors'
 import { StaggeredText } from '@/components/ui/StaggeredText'
+import { colors } from '@/constants/colors'
 import { LinearGradient } from 'expo-linear-gradient'
 import { ArrowUp, Camera, Mic, ScanBarcode } from 'lucide-react-native'
 
 const PLACEHOLDER_PHRASES = [
-  'Ask me anything...',
-  'What can I help with?',
-  'Start a conversation...',
-  'Type your message...',
+  'Am I getting enough protein?',
+  'How am I doing this week?',
+  'I just ate an apple',
+  'How is my fiber intake?',
 ]
 
 const BUTTON_SIZE = 40
@@ -32,9 +33,11 @@ const MAX_INPUT_HEIGHT = 112
 export type AnimatedInputProps = TextInputProps & {
   onSend: (text: string) => void
   hasMessages?: boolean
+  /** Keyboard height shared value from useReanimatedKeyboardAnimation */
+  keyboardHeight?: SharedValue<number>
 }
 
-export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessages = false, ...textInputProps }: AnimatedInputProps) {
+export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, ...textInputProps }: AnimatedInputProps) {
   const [value, setValue] = useState('')
   const isControlled = valueProp !== undefined
   const inputValue = isControlled ? String(valueProp) : value
@@ -54,6 +57,17 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
   const focusProgress = useSharedValue(0)
   const textProgress = useSharedValue(0)
   const wasTextPresent = useRef(false)
+
+  // Keyboard-aware positioning style
+  const rKeyboardStyle = useAnimatedStyle(() => {
+    const kbHeight = keyboardHeight?.value ?? 0
+    // When keyboard is up, move input up by keyboard height
+    // The negative value from useReanimatedKeyboardAnimation needs to be converted
+    const translateY = kbHeight // Already negative when keyboard is open
+    return {
+      transform: [{ translateY }],
+    }
+  })
 
   // Animate button collapse when text changes
   const hasText = inputValue.trim().length > 0
@@ -82,11 +96,11 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
   })
 
   const rRootContainerStyle = useAnimatedStyle(() => {
-    const paddingBottom = interpolate(
-      focusProgress.get(),
-      [0, 1],
-      [insets.bottom + 12, 12]
-    )
+    const kbHeight = keyboardHeight?.value ?? 0
+    const isKeyboardOpen = Math.abs(kbHeight) > 10
+    // When keyboard is open, use less padding (keyboard provides spacing)
+    // When closed, include safe area bottom
+    const paddingBottom = isKeyboardOpen ? 12 : insets.bottom + 12
     return { paddingBottom }
   })
 
@@ -120,7 +134,14 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
   }
 
   return (
-    <Animated.View style={rRootContainerStyle} className="mx-3 mt-auto">
+    <Animated.View
+      style={[
+        { position: 'absolute', bottom: 0, left: 0, right: 0 },
+        rKeyboardStyle,
+        rRootContainerStyle,
+      ]}
+      className="mx-3"
+    >
       <Pressable className='z-10' onPress={() => textInputRef.current?.focus()}>
         <AnimatedGlassView
           style={[
@@ -162,7 +183,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
                   phrases={PLACEHOLDER_PHRASES}
                   visible={showAnimatedPlaceholder}
                   intervalMs={3500}
-                  className="text-base text-zinc-500"
+                  className="text-base text-muted"
                 />
               </View>
             )}

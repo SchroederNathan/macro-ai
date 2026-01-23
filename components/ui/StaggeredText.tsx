@@ -2,6 +2,7 @@ import { FC, useEffect, useRef, useState } from 'react'
 import { Text } from 'react-native'
 import Animated, {
   interpolate,
+  SharedValue,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -14,7 +15,7 @@ type AnimatedCharProps = {
   char: string
   index: number
   totalCount: number
-  progress: Animated.SharedValue<number>
+  progress: SharedValue<number>
   className?: string
 }
 
@@ -70,7 +71,7 @@ export const StaggeredText: FC<StaggeredTextProps> = ({
   phrases,
   visible,
   intervalMs = 3000,
-  className = 'text-base text-zinc-500',
+  className = 'text-base text-muted',
 }) => {
   const progress = useSharedValue(0)
   const [currentIndex, setCurrentIndex] = useState(0)

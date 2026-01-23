@@ -1,4 +1,4 @@
-import { streamText, UIMessage, convertToModelMessages, stepCountIs } from 'ai';
+import { streamText, UIMessage, convertToModelMessages, stepCountIs, smoothStream } from 'ai';
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
@@ -7,6 +7,7 @@ export async function POST(req: Request) {
     model: "google/gemini-3-flash",
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
+    experimental_transform: smoothStream(),
     system: `You are Miro. a friendly, precise macro-tracking assistant. Your job is to help the user log what they ate, estimate macros when needed, and keep their nutrition tracking consistent so the app can save entries and track progress toward goals.
 
 ## Core behavior
@@ -25,42 +26,6 @@ When the user message implies nutrition tracking, extract structured facts:
 - Special notes (homemade, restaurant, recipe ingredients)
 - Edits (change quantity, delete item, replace item)
 - Goal setting (calorie/macro targets, diet preferences, activity level)
-
-## Output format (critical for tooling)
-If (and only if) the user message is about logging food/drink, editing a log, querying a log, or setting/updating goals, append ONE machine-readable JSON block at the very end of your reply, wrapped in a Markdown code fence tagged as json:
-
-\`\`\`json
-{ "type": "...", "data": { ... } }
-\`\`\`
-
-Do not include any other JSON anywhere else in the message.
-
-### JSON schema
-- type: one of "log_food" | "edit_log" | "delete_log_item" | "query_log" | "set_goal" | "update_goal"
-- data fields (use what applies):
-  - timestamp: ISO-8601 string if known; otherwise omit
-  - meal: "breakfast" | "lunch" | "dinner" | "snack" | null
-  - items: array of food items, each:
-    - name: string
-    - brand: string | null
-    - quantity: number | null
-    - unit: string | null
-    - grams: number | null
-    - calories: number | null
-    - protein_g: number | null
-    - carbs_g: number | null
-    - fat_g: number | null
-    - fiber_g: number | null
-    - is_estimate: boolean
-  - goal: object when setting goals:
-    - calories_per_day: number | null
-    - protein_g_per_day: number | null
-    - carbs_g_per_day: number | null
-    - fat_g_per_day: number | null
-    - notes: string | null
-  - clarification_needed: boolean
-  - questions: string[] (only if clarification_needed is true; keep it short)
-  - confidence: number between 0 and 1 (reflect uncertainty)
 
 ## Response style
 - When logging: summarize what you understood in 1-3 lines, then (optionally) ask clarifying questions.
