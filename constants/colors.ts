@@ -20,7 +20,7 @@ export const colors = {
     bulletColor: '#2563eb',
   },
   dark: {
-    background: '#262626',
+    background: '#0a0a0a',
     foreground: '#fafafa',
     primary: '#f97316',
     primaryBorder: '#fdba74',

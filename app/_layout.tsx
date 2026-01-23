@@ -8,15 +8,9 @@ import { Uniwind } from 'uniwind'
 import '../globals.css'
 
 import '@/polyfills'
-import { GlassView } from 'expo-glass-effect'
-import { EllipsisVertical } from 'lucide-react-native'
-import { isGlassEffectAPIAvailable } from 'expo-glass-effect'
 
 export default function Layout() {
   const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme())
-
-  const isGlassEffectAvailable = isGlassEffectAPIAvailable()
-
 
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
@@ -34,39 +28,19 @@ export default function Layout() {
       <View className={`flex-1 ${colorScheme === 'dark' ? 'dark' : 'light'}`}>
         <StatusBar style="auto" />
         <KeyboardProvider>
-          <Stack>
+          <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" options={{
+              headerShown: true, headerTransparent: true,
+              headerLargeStyle: { backgroundColor: 'transparent' },
+              headerBlurEffect: undefined,
+              title: '',
+            }} />
+            <Stack.Screen name="pager" options={{
+              headerShown: true,
               headerTransparent: true,
               headerLargeStyle: { backgroundColor: 'transparent' },
-              title: '',
               headerBlurEffect: undefined,
-              unstable_headerRightItems: () => [
-                {
-                  type: 'menu',
-                  label: 'Options',
-                  icon: {
-                    type: 'sfSymbol',
-                    name: 'ellipsis',
-                  },
-                  menu: {
-                    title: 'Options',
-                    items: [
-                      {
-                        type: 'action',
-                        label: 'Edit',
-                        icon: {
-                          type: 'sfSymbol',
-                          name: 'pencil',
-                        },
-                        onPress: () => {
-                          // Do something
-                        },
-                      },
-
-                    ],
-                  },
-                },
-              ],
+              title: '',
             }} />
           </Stack>
         </KeyboardProvider>
