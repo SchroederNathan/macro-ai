@@ -21,9 +21,9 @@ export function MessageBubble({ message, isThinking = false, thinkingStartTime }
   }, [])
 
   return (
-    <View className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} px-4 py-1`} id={message.id}>
+    <View className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} px-4 py-2`} id={message.id}>
       <View
-        className={`${isUser ? 'max-w-[80%]' : 'max-w-full'} px-4 py-3 rounded-3xl ${isUser && 'bg-user-bubble'}`}
+        className={`${isUser ? 'max-w-[80%]' : 'max-w-full'}  rounded-3xl ${isUser && 'bg-user-bubble px-4 py-3'}`}
         style={{ borderCurve: 'continuous' }}
       >
         {/* Show thinking indicator as header for assistant messages */}

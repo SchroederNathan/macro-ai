@@ -1,4 +1,4 @@
-import { GlassView } from 'expo-glass-effect'
+import { GlassContainer, GlassView } from 'expo-glass-effect'
 import { useRef, useState } from 'react'
 import { Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -10,9 +10,11 @@ import Animated, {
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { LinearGradient } from 'expo-linear-gradient'
-import { ArrowUp, Mic } from 'lucide-react-native'
 import { colors } from '@/constants/colors'
+import { LinearGradient } from 'expo-linear-gradient'
+import { ArrowUp, Camera, Mic, ScanBarcode } from 'lucide-react-native'
+
+const BUTTON_SIZE = 40
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
 
@@ -38,6 +40,34 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
   const buttonTint = isDark ? '#ff6900' : '#2563eb'
 
   const focusProgress = useSharedValue(0)
+  const textProgress = useSharedValue(0)
+  const wasTextPresent = useRef(false)
+
+  // Animate button collapse when text changes
+  const hasText = inputValue.trim().length > 0
+  if (hasText !== wasTextPresent.current) {
+    wasTextPresent.current = hasText
+    textProgress.value = withSpring(hasText ? 1 : 0)
+  }
+
+  // Animated styles for collapsing buttons - each slides to mic position
+  const gap = 8 // matches GlassContainer gap
+
+  // Camera needs to move 2 slots to reach mic position
+  const rCameraStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(textProgress.value, [0, 1], [0, (BUTTON_SIZE + gap) * 2])
+    const opacity = interpolate(textProgress.value, [0, 0.5], [1, 0])
+    const scale = interpolate(textProgress.value, [0, 1], [1, 0.8])
+    return { transform: [{ translateX }, { scale }] as const, opacity }
+  })
+
+  // Barcode needs to move 1 slot to reach mic position
+  const rBarcodeStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(textProgress.value, [0, 1], [0, BUTTON_SIZE + gap])
+    const opacity = interpolate(textProgress.value, [0, 0.5], [1, 0])
+    const scale = interpolate(textProgress.value, [0, 1], [1, 0.8])
+    return { transform: [{ translateX }, { scale }] as const, opacity }
+  })
 
   const rRootContainerStyle = useAnimatedStyle(() => {
     const paddingBottom = interpolate(
@@ -85,6 +115,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
             { borderCurve: 'continuous', borderRadius: MIN_INPUT_HEIGHT / 2 },
             rInputContainerStyle,
           ]}
+
           isInteractive
         >
           <View className="flex-row items-center">
@@ -115,30 +146,69 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, ...textI
             className="absolute bottom-0 left-0 right-0 flex-row items-center justify-end px-2"
             style={{ height: MIN_INPUT_HEIGHT }}
           >
-            <Pressable onPress={() => {
-              Haptics.selection();
-              if (inputValue.trim()) handleSend()
-            }}>
+            <GlassContainer spacing={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Camera button */}
+              <AnimatedGlassView
+                style={[
+                  {
+                    width: BUTTON_SIZE,
+                    height: BUTTON_SIZE,
+                    borderRadius: BUTTON_SIZE / 2,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                  rCameraStyle,
+                ]}
+                tintColor={containerTint}
+                isInteractive
+                onTouchEnd={() => Haptics.selection()}
+              >
+                <Camera size={18} color="white" strokeWidth={2.5} />
+              </AnimatedGlassView>
+
+              {/* Barcode button */}
+              <AnimatedGlassView
+                style={[
+                  {
+                    width: BUTTON_SIZE,
+                    height: BUTTON_SIZE,
+                    borderRadius: BUTTON_SIZE / 2,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                  rBarcodeStyle,
+                ]}
+                tintColor={containerTint}
+                isInteractive
+                onTouchEnd={() => Haptics.selection()}
+              >
+                <ScanBarcode size={18} color="white" strokeWidth={2.5} />
+              </AnimatedGlassView>
+
+              {/* Mic / Send button - stays fixed */}
               <GlassView
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
+                  width: BUTTON_SIZE,
+                  height: BUTTON_SIZE,
+                  borderRadius: BUTTON_SIZE / 2,
                   borderCurve: 'continuous',
-
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
                 tintColor={buttonTint}
                 isInteractive
+                onTouchEnd={() => {
+                  Haptics.selection()
+                  if (hasText) handleSend()
+                }}
               >
-                {inputValue.trim() ? (
-                  <ArrowUp size={16} color="white" strokeWidth={3} />
+                {hasText ? (
+                  <ArrowUp size={18} color="white" strokeWidth={3} />
                 ) : (
-                  <Mic size={16} color="white" strokeWidth={3} />
+                  <Mic size={18} color="white" strokeWidth={2.5} />
                 )}
               </GlassView>
-            </Pressable>
+            </GlassContainer>
           </View>
         </AnimatedGlassView>
       </Pressable>

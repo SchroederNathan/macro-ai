@@ -81,6 +81,7 @@ function ChatStackScreen() {
               headerLargeStyle: { backgroundColor: 'transparent' },
               headerBlurEffect: undefined,
               title: '',
+              
               unstable_headerRightItems: () => [
                 {
                   type: 'menu',
