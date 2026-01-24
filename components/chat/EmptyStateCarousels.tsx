@@ -4,7 +4,7 @@ import { GlassView } from 'expo-glass-effect'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useCallback, useEffect } from 'react'
 import { Haptics } from 'react-native-nitro-haptics'
-import { useColorScheme, View } from 'react-native'
+import { StyleSheet, useColorScheme, View } from 'react-native'
 import MaskedView from '@react-native-masked-view/masked-view'
 import Animated, {
   Easing,
@@ -17,9 +17,8 @@ import Animated, {
 import { Text } from '@/components/ui/Text'
 import { carouselRows, type CarouselItem } from './carouselData'
 
-const CARD_WIDTH = 200
 const CARD_GAP = 12
-const ITEM_WIDTH = CARD_WIDTH + CARD_GAP
+const ESTIMATED_AVG_CARD_WIDTH = 220 // Approximate for animation calculations
 const SCROLL_DURATION = 100000 // 100 seconds per full cycle
 
 type CarouselCardProps = {
@@ -39,20 +38,15 @@ function CarouselCard({ item, onPress }: CarouselCardProps) {
 
   return (
     <GlassView
-      className="flex-row items-center gap-2.5 rounded-2xl px-4 py-3"
-      style={{
-        width: CARD_WIDTH,
-        marginRight: CARD_GAP,
-        borderCurve: 'continuous',
-      }}
+      style={styles.card}
       isInteractive
       onTouchEnd={handlePress}
     >
       <Text className="text-2xl">{item.emoji}</Text>
       <Text
-        className="flex-1 text-sm"
+        className="text-sm"
         style={{ color: isDark ? colors.dark.suggestionCardText : colors.light.suggestionCardText }}
-        numberOfLines={2}
+        numberOfLines={1}
       >
         {item.text}
       </Text>
@@ -69,7 +63,7 @@ type SingleCarouselProps = {
 function SingleCarousel({ items, reverse = false, onSelectItem }: SingleCarouselProps) {
   // Triple the items for seamless looping
   const tripledItems = [...items, ...items, ...items]
-  const totalWidth = items.length * ITEM_WIDTH
+  const totalWidth = items.length * (ESTIMATED_AVG_CARD_WIDTH + CARD_GAP)
 
   const translateX = useSharedValue(reverse ? -totalWidth : 0)
 
@@ -145,35 +139,33 @@ export function EmptyStateCarousels({ onSelectItem }: EmptyStateCarouselsProps) 
       ))}
       {/* Left fade with blur */}
       <MaskedView
-        className="absolute left-0 top-0 bottom-0 pointer-events-none"
-        style={{ width: FADE_WIDTH }}
+        style={[styles.fadeLeft, { width: FADE_WIDTH }]}
         maskElement={
           <LinearGradient
             colors={['#000', 'transparent']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            className="flex-1"
+            style={styles.flex1}
           />
         }
       >
-        <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} className="flex-1" />
+        <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={styles.flex1} />
         <LinearGradient
           colors={[bgColor, bgColor + '00']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          className="absolute inset-0"
+          style={styles.absoluteFill}
         />
       </MaskedView>
       {/* Right fade with blur */}
       <MaskedView
-        className="absolute right-0 top-0 bottom-0 pointer-events-none"
-        style={{ width: FADE_WIDTH }}
+        style={[styles.fadeRight, { width: FADE_WIDTH }]}
         maskElement={
           <LinearGradient
             colors={['transparent', '#000']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            className="flex-1"
+            style={styles.flex1}
           />
         }
       >
@@ -181,9 +173,46 @@ export function EmptyStateCarousels({ onSelectItem }: EmptyStateCarouselsProps) 
           colors={[bgColor + '00', bgColor]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          className="absolute inset-0"
+          style={styles.absoluteFill}
         />
       </MaskedView>
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginRight: CARD_GAP,
+  },
+  fadeLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+  },
+  fadeRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+  },
+  flex1: {
+    flex: 1,
+  },
+  absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+})
