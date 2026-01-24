@@ -81,8 +81,24 @@ function ChatStackScreen() {
               headerLargeStyle: { backgroundColor: 'transparent' },
               headerBlurEffect: undefined,
               title: '',
-              
+
               unstable_headerRightItems: () => [
+                {
+                  type: 'menu',
+                  label: 'Options',
+                  icon: { type: 'sfSymbol', name: 'calendar' },
+                  menu: {
+                    title: 'Options',
+                    items: [
+                      {
+                        type: 'action',
+                        label: 'Edit',
+                        icon: { type: 'sfSymbol', name: 'pencil' },
+                        onPress: () => console.log('Edit pressed'),
+                      },
+                    ],
+                  },
+                },
                 {
                   type: 'menu',
                   label: 'Options',
@@ -99,6 +115,7 @@ function ChatStackScreen() {
                     ],
                   },
                 },
+
               ],
             }}
           />
