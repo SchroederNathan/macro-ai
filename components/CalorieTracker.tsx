@@ -15,11 +15,16 @@ export default function CalorieTracker({ eaten, target }: CalorieTrackerProps) {
   const remaining = Math.max(0, target - eaten)
   const progress = Math.min(eaten / target, 1)
 
-  const size = 140
-  const strokeWidth = 10 
+  const size = 180
+  const strokeWidth = 10
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
-  const strokeDashoffset = circumference * (1 - progress)
+
+  // Arc spans 75% of circle (270°), leaving gap at bottom
+  const arcPercentage = 0.75
+  const arcLength = circumference * arcPercentage
+  const gapLength = circumference - arcLength
+  const progressArcLength = arcLength * progress
 
   return (
     <View className="flex-row items-center justify-between px-6 py-6">
@@ -32,8 +37,8 @@ export default function CalorieTracker({ eaten, target }: CalorieTrackerProps) {
       {/* Circle with eaten calories */}
       <View className="items-center justify-center">
         <View style={{ width: size, height: size }}>
-          <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-            {/* Background circle */}
+          <Svg width={size} height={size} style={{ transform: [{ rotate: '135deg' }] }}>
+            {/* Background arc */}
             <Circle
               cx={size / 2}
               cy={size / 2}
@@ -41,8 +46,10 @@ export default function CalorieTracker({ eaten, target }: CalorieTrackerProps) {
               stroke={theme.border}
               strokeWidth={strokeWidth}
               fill="transparent"
+              strokeDasharray={`${arcLength} ${gapLength}`}
+              strokeLinecap="round"
             />
-            {/* Progress circle */}
+            {/* Progress arc */}
             <Circle
               cx={size / 2}
               cy={size / 2}
@@ -50,14 +57,13 @@ export default function CalorieTracker({ eaten, target }: CalorieTrackerProps) {
               stroke={theme.primary}
               strokeWidth={strokeWidth}
               fill="transparent"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
+              strokeDasharray={`${progressArcLength} ${circumference}`}
               strokeLinecap="round"
             />
           </Svg>
           <View className="absolute inset-0 items-center justify-center">
-            <Text className="text-foreground text-3xl font-bold">{eaten}</Text>
-            <Text className="text-muted text-xs uppercase tracking-wider">Eaten</Text>
+            <Text className="text-foreground text-4xl font-bold">{eaten}</Text>
+            <Text className="text-muted text-xs uppercase tracking-wider text-sans">Eaten</Text>
           </View>
         </View>
       </View>

@@ -4,7 +4,7 @@ import { useHeaderHeight } from "@react-navigation/elements"
 
 // Fake data for demonstration
 const FAKE_DATA = {
-    eaten: 1824,
+    eaten: 1694,
     target: 2500,
 }
 
