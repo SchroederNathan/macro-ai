@@ -33,23 +33,18 @@ const AnimatedChar: FC<AnimatedCharProps> = ({ index, char, progress, totalCount
   }, [])
 
   const rContainerStyle = useAnimatedStyle(() => {
+    const progress = charProgress.get()
+    const translateX = interpolate(progress, [0, 1], [-2, 0])
+    const translateY = interpolate(progress, [0, 1], [12 - index * (6 / Math.max(totalCount - 1, 1)), 0])
+    const scale = interpolate(progress, [0, 1], [0.8, 1])
+    
     return {
-      opacity: charProgress.get(),
+      opacity: progress,
       transform: [
-        {
-          translateX: interpolate(charProgress.get(), [0, 1], [-2, 0]),
-        },
-        {
-          translateY: interpolate(
-            charProgress.get(),
-            [0, 1],
-            [12 - index * (6 / Math.max(totalCount - 1, 1)), 0]
-          ),
-        },
-        {
-          scale: interpolate(charProgress.get(), [0, 1], [0.8, 1]),
-        },
-      ],
+        { translateX },
+        { translateY },
+        { scale },
+      ] as const,
     }
   })
 

@@ -1,18 +1,20 @@
 import { AnimatedInput, MessageBubble, MIN_INPUT_HEIGHT, ThinkingIndicator } from '@/components/chat'
+import { colors } from '@/constants/colors'
 import { generateAPIUrl } from '@/utils'
 import { useChat } from '@ai-sdk/react'
+import { useHeaderHeight } from '@react-navigation/elements'
 import { FlashList, type FlashListRef } from '@shopify/flash-list'
 import type { UIMessage } from 'ai'
 import { DefaultChatTransport } from 'ai'
 import { fetch as expoFetch } from 'expo/fetch'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Keyboard, Pressable, Text, View } from 'react-native'
+import { Dimensions, Keyboard, Pressable, Text, useColorScheme, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
+import type { SharedValue } from 'react-native-reanimated'
 import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useHeaderHeight } from '@react-navigation/elements'
-
-import type { SharedValue } from 'react-native-reanimated'
+import { LinearGradient } from 'expo-linear-gradient'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 /** Animated spacer that adjusts height based on keyboard */
 function KeyboardSpacer({ keyboardHeight, baseHeight }: { keyboardHeight: SharedValue<number>, baseHeight: number }) {
@@ -22,6 +24,8 @@ function KeyboardSpacer({ keyboardHeight, baseHeight }: { keyboardHeight: Shared
   return <Animated.View style={animatedStyle} />
 }
 
+const SCREEN_WIDTH = Dimensions.get('window').width
+
 export default function ChatScreen() {
   const [input, setInput] = useState('')
   const [isThinking, setIsThinking] = useState(false)
@@ -30,7 +34,8 @@ export default function ChatScreen() {
   const listRef = useRef<FlashListRef<UIMessage>>(null)
   const headerHeight = useHeaderHeight()
   const insets = useSafeAreaInsets()
-
+  const colorScheme = useColorScheme()
+  const isDark = colorScheme === 'dark'
   // Keyboard animation for content padding
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation()
 
@@ -146,6 +151,23 @@ export default function ChatScreen() {
         hasMessages={messages.length > 0}
         keyboardHeight={keyboardHeight}
       />
+      <LinearGradient
+        colors={[
+          isDark ? colors.dark.background + '00' : colors.light.background + '00',
+          isDark ? colors.dark.background : colors.light.background
+        ]}
+
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, zIndex: 0 }}
+      />
+      <Svg style={{ position: 'absolute', bottom: 0, left: 0, right: 0, width: SCREEN_WIDTH, zIndex: 10,  height: 100 }}>
+        <Defs>
+          <RadialGradient id="grad" cx="50%" cy="55%" r="70%">
+            <Stop offset="0%" stopColor={isDark ? colors.dark.primary : colors.light.primary} stopOpacity="1" />
+            <Stop offset="100%" stopColor={isDark ? colors.dark.background : colors.light.background} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#grad)" />
+      </Svg>
     </View>
   )
 }

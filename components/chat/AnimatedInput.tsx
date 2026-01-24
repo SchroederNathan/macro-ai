@@ -1,6 +1,6 @@
 import { GlassContainer, GlassView } from 'expo-glass-effect'
 import { useRef, useState } from 'react'
-import { Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
+import { Dimensions, Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
   interpolate,
@@ -15,6 +15,7 @@ import { StaggeredText } from '@/components/ui/StaggeredText'
 import { colors } from '@/constants/colors'
 import { LinearGradient } from 'expo-linear-gradient'
 import { ArrowUp, Camera, Mic, ScanBarcode } from 'lucide-react-native'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 const PLACEHOLDER_PHRASES = [
   'Am I getting enough protein?',
@@ -29,6 +30,8 @@ const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
 
 export const MIN_INPUT_HEIGHT = 56
 const MAX_INPUT_HEIGHT = 112
+
+const SCREEN_WIDTH = Dimensions.get('window').width
 
 export type AnimatedInputProps = TextInputProps & {
   onSend: (text: string) => void
@@ -136,11 +139,12 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
   return (
     <Animated.View
       style={[
-        { position: 'absolute', bottom: 0, left: 0, right: 0 },
+        { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20 },
         rKeyboardStyle,
         rRootContainerStyle,
       ]}
-      className="mx-3"
+
+      className="px-3"
     >
       <Pressable className='z-10' onPress={() => textInputRef.current?.focus()}>
         <AnimatedGlassView
@@ -210,7 +214,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
                 isInteractive
                 onTouchEnd={() => Haptics.selection()}
               >
-                <Camera size={18} color="white" strokeWidth={2.5} />
+                <Camera size={18} color={isDark ? colors.dark.foreground : colors.light.foreground} strokeWidth={2.5} />
               </AnimatedGlassView>
 
               {/* Barcode button */}
@@ -229,7 +233,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
                 isInteractive
                 onTouchEnd={() => Haptics.selection()}
               >
-                <ScanBarcode size={18} color="white" strokeWidth={2.5} />
+                <ScanBarcode size={18} color={isDark ? colors.dark.foreground : colors.light.foreground} strokeWidth={2.5} />
               </AnimatedGlassView>
 
               {/* Mic / Send button - stays fixed */}
@@ -259,14 +263,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
           </View>
         </AnimatedGlassView>
       </Pressable>
-      <LinearGradient
-        colors={[
-          isDark ? colors.dark.background + '00' : colors.light.background + '00',
-          isDark ? colors.dark.background : colors.light.background
-        ]}
 
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, zIndex: 0 }}
-      />
     </Animated.View>
   )
 }
