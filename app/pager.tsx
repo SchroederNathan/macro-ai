@@ -48,6 +48,7 @@ const ChatStack = createNativeStackNavigator()
 const HistoryStack = createNativeStackNavigator()
 
 function HomeStackScreen() {
+  const colorScheme = useColorScheme()
   return (
     <NavigationIndependentTree>
       <NavigationContainer>
@@ -59,7 +60,29 @@ function HomeStackScreen() {
               headerTransparent: true,
               headerLargeStyle: { backgroundColor: 'transparent' },
               headerBlurEffect: undefined,
-              title: '',
+              title: 'Dashboard',
+              headerTitleStyle: {
+                color: colorScheme === 'dark' ? colors.dark.foreground : colors.light.foreground,
+              },
+              headerLargeTitleEnabled: true,
+              unstable_headerRightItems: () => [
+                {
+                  type: 'menu',
+                  label: 'Options',
+                  icon: { type: 'sfSymbol', name: 'calendar' },
+                  menu: {
+                    title: 'Options',
+                    items: [
+                      {
+                        type: 'action',
+                        label: 'Edit',
+                        icon: { type: 'sfSymbol', name: 'pencil' },
+                        onPress: () => console.log('Edit pressed'),
+                      },
+                    ],
+                  },
+                },
+              ],
             }}
           />
         </HomeStack.Navigator>

@@ -159,10 +159,10 @@ export default function ChatScreen() {
 
         style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, zIndex: 0 }}
       />
-      <Svg style={{ position: 'absolute', bottom: 0, left: 0, right: 0, width: SCREEN_WIDTH, zIndex: 10,  height: 100 }}>
+      <Svg style={{ position: 'absolute', bottom: 0, left: 0, right: 0, width: SCREEN_WIDTH,  zIndex: 10,  height: 100 }}>
         <Defs>
-          <RadialGradient id="grad" cx="50%" cy="55%" r="70%">
-            <Stop offset="0%" stopColor={isDark ? colors.dark.primary : colors.light.primary} stopOpacity="1" />
+          <RadialGradient id="grad" cx="50%" cy="100%" r="100%">
+            <Stop offset="0%" stopColor={isDark ? colors.dark.primary : colors.light.primary} stopOpacity="0.3" />
             <Stop offset="100%" stopColor={isDark ? colors.dark.background : colors.light.background} stopOpacity="0" />
           </RadialGradient>
         </Defs>
