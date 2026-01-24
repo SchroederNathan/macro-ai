@@ -11,55 +11,59 @@ export function useMarkdownStyle(): MarkdownStyle {
       color: isDark ? '#fafafa' : '#0a0a0a',
       fontSize: 16,
       lineHeight: 24,
-
+      fontFamily: 'Satoshi Variable',
     },
     paragraph: {
       color: isDark ? '#fafafa' : '#0a0a0a',
       fontSize: 16,
       lineHeight: 24,
+      fontFamily: 'Satoshi Variable',
     },
     h1: {
       color: isDark ? '#fafafa' : '#0a0a0a',
       fontSize: 28,
       fontWeight: 'bold',
-
+      fontFamily: 'Satoshi Variable',
     },
     h2: {
       color: isDark ? '#fafafa' : '#0a0a0a',
       fontSize: 24,
       fontWeight: 'bold',
-
+      fontFamily: 'Satoshi Variable',
     },
     h3: {
       color: isDark ? '#fafafa' : '#0a0a0a',
       fontSize: 20,
       fontWeight: 'bold',
-      marginTop: 32
-
+      marginTop: 32,
+      fontFamily: 'Satoshi Variable',
     },
     h4: {
       color: isDark ? '#fafafa' : '#0a0a0a',
       fontSize: 18,
       fontWeight: 'bold',
-
+      fontFamily: 'Satoshi Variable',
     },
     h5: {
       color: isDark ? '#fafafa' : '#0a0a0a',
       fontSize: 16,
       fontWeight: 'bold',
-
+      fontFamily: 'Satoshi Variable',
     },
     h6: {
       color: isDark ? '#fafafa' : '#0a0a0a',
       fontSize: 14,
       fontWeight: 'bold',
-
+      fontFamily: 'Satoshi Variable',
     },
     strong: {
       color: isDark ? '#fafafa' : '#0a0a0a',
+      fontFamily: 'Satoshi Variable',
     },
     em: {
       color: isDark ? '#fafafa' : '#0a0a0a',
+      fontFamily: 'Satoshi Variable',
+      fontStyle: 'italic',
     },
     link: {
       color: isDark ? '#60a5fa' : '#2563eb',
@@ -90,7 +94,7 @@ export function useMarkdownStyle(): MarkdownStyle {
     },
     list: {
       color: isDark ? '#fafafa' : '#0a0a0a',
-
+      fontFamily: 'Satoshi Variable',
       bulletColor: isDark ? '#fafafa' : '#0a0a0a',
     },
   }), [isDark])

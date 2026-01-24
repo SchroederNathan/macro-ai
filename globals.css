@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 @import 'uniwind';
 
+@theme {
+  --font-sans: 'Satoshi Variable';
+  --font-serif: 'Sentient Variable';
+}
+
 /* Colors are synced with constants/colors.ts */
 @layer theme {
     :root {

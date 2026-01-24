@@ -1,5 +1,6 @@
 import { colors } from '@/constants/colors'
-import { Text, useColorScheme, View } from 'react-native'
+import { useColorScheme, View } from 'react-native'
+import { Text } from '@/components/ui/Text'
 import Svg, { Circle } from 'react-native-svg'
 
 type CalorieTrackerProps = {

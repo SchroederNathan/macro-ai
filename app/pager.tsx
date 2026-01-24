@@ -1,3 +1,4 @@
+import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
 import ChatScreen from '@/screens/ChatScreen'
 import HistoryScreen from '@/screens/HistoryScreen'
@@ -58,13 +59,14 @@ function HomeStackScreen() {
             component={HomeScreen}
             options={{
               headerTransparent: true,
-              headerLargeStyle: { backgroundColor: 'transparent' },
               headerBlurEffect: undefined,
-              title: 'Dashboard',
-              headerTitleStyle: {
-                color: colorScheme === 'dark' ? colors.dark.foreground : colors.light.foreground,
-              },
-              headerLargeTitleEnabled: true,
+              headerTitle: () => (
+                <Text
+                  className="font-serif text-foreground text-2xl font-bold"
+                >
+                  Dashboard
+                </Text>
+              ),
               unstable_headerRightItems: () => [
                 {
                   type: 'menu',

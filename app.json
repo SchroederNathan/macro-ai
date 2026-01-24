@@ -32,7 +32,17 @@
     },
     "plugins": [
       "expo-image",
-      "expo-font"
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Satoshi-Variable.ttf",
+            "./assets/fonts/Satoshi-VariableItalic.ttf",
+            "./assets/fonts/Sentient-Variable.ttf",
+            "./assets/fonts/Sentient-VariableItalic.ttf"
+          ]
+        }
+      ]
     ]
   }
 }

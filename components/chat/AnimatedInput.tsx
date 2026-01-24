@@ -171,6 +171,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
                 minHeight: MIN_INPUT_HEIGHT,
                 paddingTop: Platform.OS === 'ios' ? 14 : 16,
                 paddingBottom: Platform.OS === 'ios' ? 18 : 16,
+                fontFamily: 'Satoshi Variable',
               }}
               multiline
               onFocus={handleFocus}

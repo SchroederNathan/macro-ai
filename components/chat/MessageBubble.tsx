@@ -1,6 +1,7 @@
 import type { UIMessage } from 'ai'
 import { useCallback } from 'react'
-import { Linking, Text, View } from 'react-native'
+import { Linking, View } from 'react-native'
+import { Text } from '@/components/ui/Text'
 import { EnrichedMarkdownText } from 'react-native-enriched-markdown'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { useMarkdownStyle } from './useMarkdownStyle'
@@ -15,6 +16,12 @@ export function MessageBubble({ message, isThinking = false, thinkingStartTime }
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
   const markdownStyle = useMarkdownStyle()
+
+  const fonts = require('react-native').Platform.OS === 'ios'
+    ? require('react-native').UIManager.getConstants?.()?.fontNames || []
+    : []
+
+  console.log(fonts.filter(f => f.toLowerCase().includes('sent')))
 
   const handleLinkPress = useCallback((url: string) => {
     Linking.openURL(url)

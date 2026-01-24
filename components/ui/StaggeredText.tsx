@@ -1,5 +1,5 @@
 import { FC, useEffect, useRef, useState } from 'react'
-import { Text } from 'react-native'
+import { Text } from '@/components/ui/Text'
 import Animated, {
   interpolate,
   SharedValue,

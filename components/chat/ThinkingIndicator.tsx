@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Text, useColorScheme, View } from 'react-native'
+import { useColorScheme, View } from 'react-native'
+import { Text } from '@/components/ui/Text'
 import { ShimmerText } from './ShimmerText'
 
 type ThinkingIndicatorProps = {
