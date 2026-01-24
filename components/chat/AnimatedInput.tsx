@@ -171,7 +171,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
                 minHeight: MIN_INPUT_HEIGHT,
                 paddingTop: Platform.OS === 'ios' ? 14 : 16,
                 paddingBottom: Platform.OS === 'ios' ? 18 : 16,
-                fontFamily: 'Satoshi Variable',
+                fontFamily: 'Sentient Variable',
               }}
               multiline
               onFocus={handleFocus}
@@ -188,7 +188,7 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
                   phrases={PLACEHOLDER_PHRASES}
                   visible={showAnimatedPlaceholder}
                   intervalMs={3500}
-                  className="text-base text-muted"
+                  className="text-base text-muted font-serif"
                 />
               </View>
             )}

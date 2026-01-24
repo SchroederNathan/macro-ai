@@ -18,6 +18,8 @@ export const colors = {
     blockquoteBorder: '#2563eb',
     blockquoteText: '#71717a',
     bulletColor: '#2563eb',
+    suggestionCard: '#f5f0e8',
+    suggestionCardText: '#44403c',
   },
   dark: {
     background: '#0a0a0a',
@@ -39,6 +41,8 @@ export const colors = {
     blockquoteBorder: '#60a5fa',
     blockquoteText: '#a1a1aa',
     bulletColor: '#60a5fa',
+    suggestionCard: '#3d3a36',
+    suggestionCardText: '#e7e5e4',
   },
 } as const
 

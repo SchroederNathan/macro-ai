@@ -5,7 +5,7 @@ export const Text = forwardRef<RNText, TextProps>(
   ({ className, style, ...props }, ref) => (
     <RNText
       ref={ref}
-      className={`font-sans ${className ?? ''}`}
+      className={`font-serif ${className ?? ''}`}
       style={style}
       {...props}
     />

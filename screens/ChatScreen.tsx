@@ -1,4 +1,4 @@
-import { AnimatedInput, MessageBubble, MIN_INPUT_HEIGHT, ThinkingIndicator } from '@/components/chat'
+import { AnimatedInput, EmptyStateCarousels, MessageBubble, MIN_INPUT_HEIGHT, ThinkingIndicator } from '@/components/chat'
 import { colors } from '@/constants/colors'
 import { generateAPIUrl } from '@/utils'
 import { useChat } from '@ai-sdk/react'
@@ -93,6 +93,12 @@ export default function ChatScreen() {
     })
   }
 
+  const handleCarouselSelect = useCallback((text: string) => {
+    setIsThinking(true)
+    setThinkingStartTime(Date.now())
+    sendMessage({ text })
+  }, [sendMessage])
+
   // Check if we need a standalone thinking indicator (no assistant message yet)
   const lastMessage = messages[messages.length - 1]
   const needsStandaloneThinking = isThinking && (!lastMessage || lastMessage.role === 'user')
@@ -118,6 +124,11 @@ export default function ChatScreen() {
     <View className="flex-1 bg-background">
       {/* Messages list - fills entire screen, content scrolls under input */}
       <Pressable className="absolute inset-0" onPress={Keyboard.dismiss}>
+        {messages.length === 0 && (
+          <View style={{ paddingTop: headerHeight + 8 }}>
+            <EmptyStateCarousels onSelectItem={handleCarouselSelect} />
+          </View>
+        )}
         <FlashList
           ref={listRef}
           data={messages}
