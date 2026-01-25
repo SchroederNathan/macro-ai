@@ -42,7 +42,8 @@
             "./assets/fonts/Sentient-VariableItalic.ttf"
           ]
         }
-      ]
+      ],
+      "expo-sqlite"
     ]
   }
 }

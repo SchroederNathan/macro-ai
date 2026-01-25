@@ -6,7 +6,6 @@ import HomeScreen from '@/screens/HomeScreen'
 import { NavigationContainer, NavigationIndependentTree } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { BlurView } from 'expo-blur'
-import { Stack } from 'expo-router'
 import { useCallback, useRef } from 'react'
 import { ColorSchemeName, StyleSheet, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -202,31 +201,28 @@ export default function PagerScreen() {
   }, [scrollPosition])
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <PagerView
-        ref={pagerRef}
-        style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? colors.dark.background : colors.light.background }}
-        initialPage={1}
-        onPageScroll={handlePageScroll}
-      >
-        <View key="home" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={0} scrollPosition={scrollPosition} colorScheme={colorScheme}>
-            <HomeStackScreen />
-          </BlurredPage>
-        </View>
-        <View key="chat" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={1} scrollPosition={scrollPosition} colorScheme={colorScheme}>
-            <ChatStackScreen />
-          </BlurredPage>
-        </View>
-        <View key="history" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={2} scrollPosition={scrollPosition} colorScheme={colorScheme}>
-            <HistoryStackScreen />
-          </BlurredPage>
-        </View>
-      </PagerView>
-    </>
+    <PagerView
+      ref={pagerRef}
+      style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? colors.dark.background : colors.light.background }}
+      initialPage={1}
+      onPageScroll={handlePageScroll}
+    >
+      <View key="home" style={{ flex: 1 }}>
+        <BlurredPage pageIndex={0} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <HomeStackScreen />
+        </BlurredPage>
+      </View>
+      <View key="chat" style={{ flex: 1 }}>
+        <BlurredPage pageIndex={1} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <ChatStackScreen />
+        </BlurredPage>
+      </View>
+      <View key="history" style={{ flex: 1 }}>
+        <BlurredPage pageIndex={2} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <HistoryStackScreen />
+        </BlurredPage>
+      </View>
+    </PagerView>
   )
 }
 

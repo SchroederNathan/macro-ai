@@ -1,4 +1,5 @@
-import { Stack } from 'expo-router'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { Stack, SplashScreen } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
 import { Appearance, View } from 'react-native'
@@ -9,7 +10,11 @@ import '../globals.css'
 
 import '@/polyfills'
 
-export default function Layout() {
+// Prevent splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync()
+
+function RootLayoutNav() {
+  const { session, isLoading } = useAuth()
   const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme())
 
   useEffect(() => {
@@ -18,6 +23,16 @@ export default function Layout() {
     })
     return () => subscription.remove()
   }, [])
+
+  useEffect(() => {
+    if (!isLoading) {
+      SplashScreen.hideAsync()
+    }
+  }, [isLoading])
+
+  if (isLoading) {
+    return null
+  }
 
   return (
     <SafeAreaListener
@@ -29,22 +44,23 @@ export default function Layout() {
         <StatusBar style="auto" />
         <KeyboardProvider>
           <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" options={{
-              headerShown: true, headerTransparent: true,
-              headerLargeStyle: { backgroundColor: 'transparent' },
-              headerBlurEffect: undefined,
-              title: '',
-            }} />
-            <Stack.Screen name="pager" options={{
-              headerShown: true,
-              headerTransparent: true,
-              headerLargeStyle: { backgroundColor: 'transparent' },
-              headerBlurEffect: undefined,
-              title: '',
-            }} />
+            <Stack.Protected guard={!!session}>
+              <Stack.Screen name="(app)" />
+            </Stack.Protected>
+            <Stack.Protected guard={!session}>
+              <Stack.Screen name="onboarding" />
+            </Stack.Protected>
           </Stack>
         </KeyboardProvider>
       </View>
     </SafeAreaListener>
+  )
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
   )
 }
