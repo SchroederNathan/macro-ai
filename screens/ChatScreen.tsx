@@ -1,6 +1,7 @@
-import { AnimatedInput, EmptyStateCarousels, MessageBubble, MIN_INPUT_HEIGHT, ThinkingIndicator } from '@/components/chat'
+import { AnimatedInput, EmptyStateCarousels, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
 import { colors } from '@/constants/colors'
 import { generateAPIUrl } from '@/utils'
+import { useDailyLogStore, useUserStore } from '@/stores'
 import { useChat } from '@ai-sdk/react'
 import { useHeaderHeight } from '@react-navigation/elements'
 import { FlashList, type FlashListRef } from '@shopify/flash-list'
@@ -27,11 +28,22 @@ function KeyboardSpacer({ keyboardHeight, baseHeight }: { keyboardHeight: Shared
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 
+type ToolActivity = {
+  toolName: string | null
+  toolState: string | null
+  foodQuery: string | null
+}
+
 export default function ChatScreen() {
   const [input, setInput] = useState('')
   const [isThinking, setIsThinking] = useState(false)
-  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
+  const [toolActivity, setToolActivity] = useState<ToolActivity>({
+    toolName: null,
+    toolState: null,
+    foodQuery: null,
+  })
   const prevMessageCountRef = useRef(0)
+  const processedToolCallsRef = useRef<Set<string>>(new Set())
   const listRef = useRef<FlashListRef<UIMessage>>(null)
   const headerHeight = useHeaderHeight()
   const insets = useSafeAreaInsets()
@@ -39,6 +51,16 @@ export default function ChatScreen() {
   const isDark = colorScheme === 'dark'
   // Keyboard animation for content padding
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation()
+
+  // Zustand stores
+  const dailyLogStore = useDailyLogStore()
+  const userStore = useUserStore()
+
+  // Load stores on mount
+  useEffect(() => {
+    dailyLogStore.load()
+    userStore.load()
+  }, [])
 
   const { messages, error, sendMessage } = useChat({
     transport: new DefaultChatTransport({
@@ -48,8 +70,101 @@ export default function ChatScreen() {
     onError: error => {
       console.error(error, 'ERROR')
       setIsThinking(false)
+      setToolActivity({ toolName: null, toolState: null, foodQuery: null })
+    },
+    onFinish: () => {
+      setIsThinking(false)
+      // Clear tool activity after a short delay to show completion state
+      setTimeout(() => {
+        setToolActivity({ toolName: null, toolState: null, foodQuery: null })
+      }, 1500)
     },
   })
+
+  // Watch messages for tool activity and results
+  useEffect(() => {
+    // Only look at the LAST assistant message for current tool state
+    const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant')
+    if (!lastAssistantMessage?.parts) {
+      return
+    }
+
+    // Find the latest tool part in the last assistant message
+    let latestToolPart: any = null
+    for (const part of lastAssistantMessage.parts) {
+      if (part.type.startsWith('tool-')) {
+        latestToolPart = part
+      }
+    }
+
+    // Update tool activity state based on latest tool
+    if (latestToolPart) {
+      const partAny = latestToolPart as any
+      const foodQuery = partAny.input?.foodQuery || null
+      const newState = partAny.state
+
+      setToolActivity({
+        toolName: latestToolPart.type,
+        toolState: newState,
+        foodQuery,
+      })
+
+      // Keep isThinking true while tool is in progress
+      if (newState !== 'output-available') {
+        setIsThinking(true)
+      }
+    }
+
+    // Process tool results for logging (check all messages to avoid missing any)
+    for (const message of messages) {
+      if (message.role !== 'assistant' || !message.parts) continue
+
+      for (const part of message.parts) {
+        if (part.type !== 'tool-lookup_and_log_food') continue
+
+        const partAny = part as any
+        const toolCallId = partAny.toolCallId
+        if (!toolCallId) continue
+
+        // Skip if already processed
+        if (processedToolCallsRef.current.has(toolCallId)) continue
+
+        // Check if this is a completed call with output
+        if (partAny.state === 'output-available' && partAny.output) {
+          const result = partAny.output as {
+            success?: boolean
+            entry?: {
+              name: string
+              quantity: number
+              serving: { amount: number; unit: string; gramWeight: number }
+              nutrients: { calories: number; protein: number; carbs: number; fat: number; fiber?: number; sugar?: number }
+              meal?: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+              fdcId?: number
+            }
+          }
+
+          if (result.success && result.entry) {
+            // Mark as processed FIRST to prevent duplicates
+            processedToolCallsRef.current.add(toolCallId)
+
+            // Add entry to daily log store
+            const entry = dailyLogStore.addEntry({
+              quantity: result.entry.quantity,
+              snapshot: {
+                name: result.entry.name,
+                serving: result.entry.serving,
+                nutrients: result.entry.nutrients,
+                fdcId: result.entry.fdcId,
+              },
+              meal: result.entry.meal,
+            })
+
+            console.log('Food logged:', entry.snapshot.name, entry.snapshot.nutrients.calories, 'cal')
+          }
+        }
+      }
+    }
+  }, [messages])
 
   // Base bottom padding: input height + safe area + some margin
   const baseBottomPadding = MIN_INPUT_HEIGHT + insets.bottom + 40
@@ -62,12 +177,18 @@ export default function ChatScreen() {
   }, [messages.length])
 
 
-  // Track when assistant responds (message count increases with assistant message)
+  // Track when assistant responds with actual TEXT content (not just tool activity)
   useEffect(() => {
     const lastMessage = messages[messages.length - 1]
-    if (lastMessage?.role === 'assistant' && messages.length > prevMessageCountRef.current) {
-      // Assistant has started responding
-      setIsThinking(false)
+    if (lastMessage?.role === 'assistant' && lastMessage.parts) {
+      // Check if there's any text content in the message
+      const hasTextContent = lastMessage.parts.some(
+        (part: any) => part.type === 'text' && part.text?.trim()
+      )
+      if (hasTextContent) {
+        setIsThinking(false)
+        setToolActivity({ toolName: null, toolState: null, foodQuery: null })
+      }
     }
     prevMessageCountRef.current = messages.length
   }, [messages])
@@ -85,7 +206,7 @@ export default function ChatScreen() {
   const handleSend = () => {
     if (!input.trim()) return
     setIsThinking(true)
-    setThinkingStartTime(Date.now())
+    setToolActivity({ toolName: null, toolState: null, foodQuery: null })
     sendMessage({ text: input })
     // Scroll to bottom after sending
     requestAnimationFrame(() => {
@@ -95,28 +216,32 @@ export default function ChatScreen() {
 
   const handleCarouselSelect = useCallback((text: string) => {
     setIsThinking(true)
-    setThinkingStartTime(Date.now())
+    setToolActivity({ toolName: null, toolState: null, foodQuery: null })
     sendMessage({ text })
   }, [sendMessage])
 
-  // Check if we need a standalone thinking indicator (no assistant message yet)
-  const lastMessage = messages[messages.length - 1]
-  const needsStandaloneThinking = isThinking && (!lastMessage || lastMessage.role === 'user')
+  // Show activity indicator while thinking or tool is active
+  const showActivityIndicator = isThinking || (toolActivity.toolName && toolActivity.toolState !== 'output-available')
 
   // Footer component with keyboard-aware spacer
   const ListFooter = useMemo(() => (
     <>
-      {needsStandaloneThinking && (
+      {showActivityIndicator && (
         <View className="px-4 py-1">
           <View className="px-4 py-3">
-            <ThinkingIndicator isThinking={true} startTime={thinkingStartTime} />
+            <ToolActivityIndicator
+              isThinking={isThinking}
+              toolName={toolActivity.toolName}
+              toolState={toolActivity.toolState}
+              foodQuery={toolActivity.foodQuery || undefined}
+            />
           </View>
         </View>
       )}
       {/* Spacer that grows with keyboard to keep content above it */}
       <KeyboardSpacer keyboardHeight={keyboardHeight} baseHeight={baseBottomPadding} />
     </>
-  ), [needsStandaloneThinking, thinkingStartTime, keyboardHeight, baseBottomPadding])
+  ), [showActivityIndicator, toolActivity, keyboardHeight, baseBottomPadding, isThinking])
 
   if (error) return <Text>{error.message}</Text>
 
@@ -138,8 +263,8 @@ export default function ChatScreen() {
           renderItem={({ item, index }) => (
             <MessageBubble
               message={item}
-              isThinking={isThinking && index === messages.length - 1}
-              thinkingStartTime={thinkingStartTime}
+              isThinking={false}
+              thinkingStartTime={null}
             />
           )}
           contentContainerStyle={{

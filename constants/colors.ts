@@ -26,7 +26,7 @@ export const colors = {
     foreground: '#fafafa',
     primary: '#f97316',
     primaryBorder: '#fdba74',
-    muted: '#78716c',
+    muted: '#a3a3a3',
     mutedForeground: '#404040',
     card: '#2f2f2f',
     border: '#404040',

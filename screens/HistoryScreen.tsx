@@ -1,5 +1,6 @@
 import { Text } from '@/components/ui/Text'
 import { useAuth } from '@/contexts/AuthContext'
+import { clearAllData } from '@/lib/storage'
 import { Pressable, View } from "react-native"
 import { createMMKV } from 'react-native-mmkv'
 
@@ -8,9 +9,12 @@ export default function HistoryScreen() {
 
     const handleResetAndLogout = async () => {
         try {
-            // Clear all MMKV storage
-            const storage = createMMKV({ id: 'supabase-auth' })
-            storage.clearAll()
+            // Clear all MMKV storage for auth
+            const authStorage = createMMKV({ id: 'supabase-auth' })
+            authStorage.clearAll()
+
+            // Clear all app data (food logs, chat messages, user goals)
+            clearAllData()
 
             // Sign out
             await signOut()
