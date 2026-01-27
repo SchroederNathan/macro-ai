@@ -1,4 +1,4 @@
-import { AnimatedInput, EmptyStateCarousels, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
+import { AnimatedInput, type AnimatedInputRef, EmptyStateCarousels, FoodConfirmationCard, type FoodConfirmationEntry, MAX_INPUT_HEIGHT, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
 import { colors } from '@/constants/colors'
 import { generateAPIUrl } from '@/utils'
 import { useDailyLogStore, useUserStore } from '@/stores'
@@ -9,6 +9,7 @@ import type { UIMessage } from 'ai'
 import { DefaultChatTransport } from 'ai'
 import { fetch as expoFetch } from 'expo/fetch'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Haptics } from 'react-native-nitro-haptics'
 import { Dimensions, Keyboard, Pressable, useColorScheme, View } from 'react-native'
 import { Text } from '@/components/ui/Text'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
@@ -42,9 +43,16 @@ export default function ChatScreen() {
     toolState: null,
     foodQuery: null,
   })
+  const [pendingEntries, setPendingEntries] = useState<Array<{
+    toolCallId: string
+    entry: FoodConfirmationEntry
+  }>>([])
+  const [showCard, setShowCard] = useState(false)
+  const [inputFocused, setInputFocused] = useState(false)
   const prevMessageCountRef = useRef(0)
   const processedToolCallsRef = useRef<Set<string>>(new Set())
   const listRef = useRef<FlashListRef<UIMessage>>(null)
+  const inputRef = useRef<AnimatedInputRef>(null)
   const headerHeight = useHeaderHeight()
   const insets = useSafeAreaInsets()
   const colorScheme = useColorScheme()
@@ -83,9 +91,19 @@ export default function ChatScreen() {
 
   // Watch messages for tool activity and results
   useEffect(() => {
-    // Only look at the LAST assistant message for current tool state
-    const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant')
+    // Find the last user message index
+    const lastUserMessageIndex = messages.findLastIndex(m => m.role === 'user')
+
+    // Only look at assistant messages AFTER the last user message
+    const assistantMessagesAfterUser = messages.slice(lastUserMessageIndex + 1).filter(m => m.role === 'assistant')
+    const lastAssistantMessage = assistantMessagesAfterUser[assistantMessagesAfterUser.length - 1]
+
     if (!lastAssistantMessage?.parts) {
+      // No assistant message after last user message - clear tool activity
+      if (lastUserMessageIndex === messages.length - 1) {
+        // User just sent a message, waiting for response
+        setToolActivity({ toolName: null, toolState: null, foodQuery: null })
+      }
       return
     }
 
@@ -113,6 +131,9 @@ export default function ChatScreen() {
       if (newState !== 'output-available') {
         setIsThinking(true)
       }
+    } else {
+      // Assistant message has no tool parts - clear tool activity
+      setToolActivity({ toolName: null, toolState: null, foodQuery: null })
     }
 
     // Process tool results for logging (check all messages to avoid missing any)
@@ -144,30 +165,34 @@ export default function ChatScreen() {
           }
 
           if (result.success && result.entry) {
-            // Mark as processed FIRST to prevent duplicates
+            // Mark as processed to prevent duplicates
             processedToolCallsRef.current.add(toolCallId)
 
-            // Add entry to daily log store
-            const entry = dailyLogStore.addEntry({
-              quantity: result.entry.quantity,
-              snapshot: {
+            // Show card and append to pending entries for user confirmation
+            setShowCard(true)
+            setPendingEntries(prev => [...prev, {
+              toolCallId,
+              entry: {
                 name: result.entry.name,
+                quantity: result.entry.quantity,
                 serving: result.entry.serving,
                 nutrients: result.entry.nutrients,
+                meal: result.entry.meal,
                 fdcId: result.entry.fdcId,
               },
-              meal: result.entry.meal,
-            })
+            }])
 
-            console.log('Food logged:', entry.snapshot.name, entry.snapshot.nutrients.calories, 'cal')
+            console.log('Food ready for confirmation:', result.entry.name, result.entry.nutrients.calories, 'cal')
           }
         }
       }
     }
   }, [messages])
 
-  // Base bottom padding: input height + safe area + some margin
-  const baseBottomPadding = MIN_INPUT_HEIGHT + insets.bottom + 40
+  // Base bottom padding: input height + safe area + some margin + card height if visible
+  const cardVisible = showCard || pendingEntries.length > 0
+  const cardHeight = cardVisible ? 200 : 0 // Approximate card height
+  const baseBottomPadding = MIN_INPUT_HEIGHT + insets.bottom + 40 + cardHeight
 
   // Scroll to bottom helper
   const scrollToBottom = useCallback((animated = true) => {
@@ -220,28 +245,70 @@ export default function ChatScreen() {
     sendMessage({ text })
   }, [sendMessage])
 
+  // Helper to get default meal based on time of day
+  const getDefaultMeal = (): 'breakfast' | 'lunch' | 'dinner' | 'snack' => {
+    const hour = new Date().getHours()
+    if (hour < 10) return 'breakfast'
+    if (hour < 14) return 'lunch'
+    if (hour < 20) return 'dinner'
+    return 'snack'
+  }
+
+  // Handle confirming and logging all pending food entries
+  const handleConfirmLog = useCallback(() => {
+    if (pendingEntries.length === 0) return
+
+    // Add all entries to daily log store
+    for (const pending of pendingEntries) {
+      const entry = dailyLogStore.addEntry({
+        quantity: pending.entry.quantity,
+        snapshot: {
+          name: pending.entry.name,
+          serving: pending.entry.serving,
+          nutrients: pending.entry.nutrients,
+          fdcId: pending.entry.fdcId,
+        },
+        meal: pending.entry.meal || getDefaultMeal(),
+      })
+      console.log('Food logged:', entry.snapshot.name, entry.snapshot.nutrients.calories, 'cal')
+    }
+
+    setPendingEntries([])
+    setShowCard(false)
+  }, [pendingEntries, dailyLogStore])
+
+  // Handle removing a specific entry from the pending list
+  const handleRemoveEntry = useCallback((index: number) => {
+    Haptics.selection()
+    setPendingEntries(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
   // Show activity indicator while thinking or tool is active
   const showActivityIndicator = isThinking || (toolActivity.toolName && toolActivity.toolState !== 'output-available')
 
   // Footer component with keyboard-aware spacer
   const ListFooter = useMemo(() => (
     <>
+      {/* Tool activity indicator - inline with messages */}
       {showActivityIndicator && (
-        <View className="px-4 py-1">
-          <View className="px-4 py-3">
-            <ToolActivityIndicator
-              isThinking={isThinking}
-              toolName={toolActivity.toolName}
-              toolState={toolActivity.toolState}
-              foodQuery={toolActivity.foodQuery || undefined}
-            />
-          </View>
+        <View className="px-4 py-2">
+          <ToolActivityIndicator
+            isThinking={isThinking}
+            toolName={toolActivity.toolName}
+            toolState={toolActivity.toolState}
+            foodQuery={toolActivity.foodQuery || undefined}
+          />
         </View>
       )}
       {/* Spacer that grows with keyboard to keep content above it */}
       <KeyboardSpacer keyboardHeight={keyboardHeight} baseHeight={baseBottomPadding} />
     </>
   ), [showActivityIndicator, toolActivity, keyboardHeight, baseBottomPadding, isThinking])
+
+  // Animated style for floating card above input
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: keyboardHeight.value }],
+  }))
 
   if (error) return <Text>{error.message}</Text>
 
@@ -260,12 +327,8 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
-          renderItem={({ item, index }) => (
-            <MessageBubble
-              message={item}
-              isThinking={false}
-              thinkingStartTime={null}
-            />
+          renderItem={({ item }) => (
+            <MessageBubble message={item} />
           )}
           contentContainerStyle={{
             paddingTop: headerHeight + 8,
@@ -280,13 +343,41 @@ export default function ChatScreen() {
         />
       </Pressable>
 
+      {/* Food confirmation card - pinned above input */}
+      {cardVisible && (
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              // When focused (keyboard open): inputHeight + containerPadding(12) + margin(16)
+              // When unfocused (keyboard closed): inputHeight + insets.bottom + containerPadding(12) + margin(16)
+              bottom: inputFocused
+                ? MAX_INPUT_HEIGHT + 28
+                : MIN_INPUT_HEIGHT + insets.bottom + 28,
+              left: 0,
+              right: 0,
+              zIndex: 25
+            },
+            cardAnimatedStyle,
+          ]}
+        >
+          <FoodConfirmationCard
+            entries={pendingEntries.map(p => p.entry)}
+            onConfirm={handleConfirmLog}
+            onRemove={handleRemoveEntry}
+          />
+        </Animated.View>
+      )}
+
       {/* Floating input - positioned over content with keyboard animation */}
       <AnimatedInput
+        ref={inputRef}
         value={input}
         onChangeText={setInput}
         onSend={handleSend}
         hasMessages={messages.length > 0}
         keyboardHeight={keyboardHeight}
+        onFocusChange={setInputFocused}
       />
       <LinearGradient
         colors={[

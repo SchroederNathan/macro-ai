@@ -3,18 +3,14 @@ import type { UIMessage } from 'ai'
 import { useCallback } from 'react'
 import { Linking, View } from 'react-native'
 import { EnrichedMarkdownText } from 'react-native-enriched-markdown'
-import { ThinkingIndicator } from './ThinkingIndicator'
 import { useMarkdownStyle } from './useMarkdownStyle'
 
 type MessageBubbleProps = {
   message: UIMessage
-  isThinking?: boolean
-  thinkingStartTime?: number | null
 }
 
-export function MessageBubble({ message, isThinking = false, thinkingStartTime }: MessageBubbleProps) {
+export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user'
-  const isAssistant = message.role === 'assistant'
   const markdownStyle = useMarkdownStyle()
 
   const handleLinkPress = useCallback((url: string) => {
@@ -27,11 +23,6 @@ export function MessageBubble({ message, isThinking = false, thinkingStartTime }
         className={`${isUser ? 'max-w-[80%]' : 'max-w-full'}  rounded-3xl ${isUser && 'bg-user-bubble px-4 py-3'}`}
         style={{ borderCurve: 'continuous' }}
       >
-        {/* Show thinking indicator as header for assistant messages */}
-        {isAssistant && (
-          <ThinkingIndicator isThinking={isThinking} startTime={thinkingStartTime} />
-        )}
-
         {message.parts.map((part, i) => {
           switch (part.type) {
             case 'text':

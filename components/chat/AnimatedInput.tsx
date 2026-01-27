@@ -1,5 +1,5 @@
 import { GlassContainer, GlassView } from 'expo-glass-effect'
-import { useRef, useState } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { Dimensions, Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
@@ -17,6 +17,11 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { ArrowUp, Camera, Mic, ScanBarcode } from 'lucide-react-native'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
+export type AnimatedInputRef = {
+  focus: () => void
+  blur: () => void
+}
+
 const PLACEHOLDER_PHRASES = [
   'Am I getting enough protein?',
   'How am I doing this week?',
@@ -29,7 +34,7 @@ const BUTTON_SIZE = 40
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
 
 export const MIN_INPUT_HEIGHT = 56
-const MAX_INPUT_HEIGHT = 112
+export const MAX_INPUT_HEIGHT = 112
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 
@@ -38,14 +43,25 @@ export type AnimatedInputProps = TextInputProps & {
   hasMessages?: boolean
   /** Keyboard height shared value from useReanimatedKeyboardAnimation */
   keyboardHeight?: SharedValue<number>
+  /** Called when input focus changes */
+  onFocusChange?: (focused: boolean) => void
 }
 
-export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, ...textInputProps }: AnimatedInputProps) {
+export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(function AnimatedInput(
+  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, ...textInputProps },
+  ref
+) {
   const [value, setValue] = useState('')
   const isControlled = valueProp !== undefined
   const inputValue = isControlled ? String(valueProp) : value
 
   const textInputRef = useRef<TextInput>(null)
+
+  // Expose focus/blur methods via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => textInputRef.current?.focus(),
+    blur: () => textInputRef.current?.blur(),
+  }))
   const insets = useSafeAreaInsets()
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
@@ -127,13 +143,13 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
   }
 
   const handleFocus = () => {
-
     focusProgress.set(withSpring(1))
+    onFocusChange?.(true)
   }
 
   const handleBlur = () => {
-
     focusProgress.set(withSpring(0))
+    onFocusChange?.(false)
   }
 
   return (
@@ -267,4 +283,4 @@ export function AnimatedInput({ onSend, value: valueProp, onChangeText, hasMessa
 
     </Animated.View>
   )
-}
+})

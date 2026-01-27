@@ -79,6 +79,7 @@ export async function POST(req: Request) {
         description: 'Look up a food in the USDA database and log it. Use this when the user says they ate something. If the food is not found in USDA, provide your best estimate for the macros.',
         inputSchema: z.object({
           foodQuery: z.string().describe('The food to search for (e.g., "banana", "grilled chicken breast")'),
+          displayName: z.string().describe('A friendly, human-readable name for the food (e.g., "Banana", "Grilled Chicken Breast", "Greek Yogurt")'),
           quantity: z.number().default(1).describe('Number of servings (default 1)'),
           meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack']).optional().describe('Meal type if mentioned'),
           // LLM-provided estimates used as fallback when USDA lookup fails
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
           estimatedCarbs: z.number().optional().describe('Your estimated carbs (g) per serving if USDA lookup fails'),
           estimatedFat: z.number().optional().describe('Your estimated fat (g) per serving if USDA lookup fails'),
         }),
-        execute: async ({ foodQuery, quantity = 1, meal, estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat }) => {
+        execute: async ({ foodQuery, displayName, quantity = 1, meal, estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat }) => {
           console.log('[LOOKUP] Searching for:', foodQuery);
 
           // LLM-provided fallback macros (per serving)
@@ -105,14 +106,14 @@ export async function POST(req: Request) {
               return {
                 success: true,
                 entry: {
-                  name: foodQuery,
+                  name: displayName,
                   quantity,
                   serving: { amount: 1, unit: 'serving', gramWeight: 100 },
                   nutrients: llmFallback,
                   meal,
                 },
                 estimated: true,
-                message: `Logged ${quantity} ${foodQuery} (estimated: ${llmFallback.calories} cal)`,
+                message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
               };
             }
             // No API key and no LLM estimate - return failure so LLM can retry with estimates
@@ -156,14 +157,14 @@ export async function POST(req: Request) {
                   return {
                     success: true,
                     entry: {
-                      name: foodQuery,
+                      name: displayName,
                       quantity,
                       serving: { amount: 1, unit: 'serving', gramWeight: 100 },
                       nutrients: llmFallback,
                       meal,
                     },
                     estimated: true,
-                    message: `Logged ${quantity} ${foodQuery} (estimated: ${llmFallback.calories} cal)`,
+                    message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
                   };
                 }
                 // No results and no LLM estimate - return failure so LLM can retry with estimates
@@ -254,7 +255,7 @@ export async function POST(req: Request) {
                 return {
                   success: true,
                   entry: {
-                    name: food.description || foodQuery,
+                    name: displayName,
                     quantity,
                     serving: { amount: 1, unit: 'serving', gramWeight: 100 },
                     nutrients: llmFallback,
@@ -262,7 +263,7 @@ export async function POST(req: Request) {
                     fdcId,
                   },
                   estimated: true,
-                  message: `Logged ${quantity} ${food.description || foodQuery} (estimated: ${llmFallback.calories} cal)`,
+                  message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
                 };
               }
               console.log('[LOOKUP] No valid nutrients and no estimates provided');
@@ -308,19 +309,19 @@ export async function POST(req: Request) {
               fat: Math.round(macros.fat * scale * 10) / 10,
             };
 
-            console.log('[LOOKUP] Final entry:', food.description, nutrients.calories, 'cal per', serving.unit);
+            console.log('[LOOKUP] Final entry:', displayName, nutrients.calories, 'cal per', serving.unit);
 
             return {
               success: true,
               entry: {
-                name: food.description,
+                name: displayName,
                 quantity,
                 serving,
                 nutrients,
                 meal,
                 fdcId,
               },
-              message: `Logged ${quantity} ${serving.unit} ${food.description} - ${nutrients.calories * quantity} cal, ${nutrients.protein * quantity}g protein`,
+              message: `Logged ${quantity} ${serving.unit} ${displayName} - ${nutrients.calories * quantity} cal, ${nutrients.protein * quantity}g protein`,
             };
           } catch (error) {
             console.error('[LOOKUP] Error:', error);
@@ -329,14 +330,14 @@ export async function POST(req: Request) {
               return {
                 success: true,
                 entry: {
-                  name: foodQuery,
+                  name: displayName,
                   quantity,
                   serving: { amount: 1, unit: 'serving', gramWeight: 100 },
                   nutrients: llmFallback,
                   meal,
                 },
                 estimated: true,
-                message: `Logged ${quantity} ${foodQuery} (estimated: ${llmFallback.calories} cal)`,
+                message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
               };
             }
             return {
@@ -353,8 +354,19 @@ export async function POST(req: Request) {
 
 When a user says they ate something (like "I had a banana" or "ate chicken for lunch"):
 1. Use the lookup_and_log_food tool with the food name
-2. ALWAYS provide your best estimated macros (estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat) as backup in case the USDA lookup fails
-3. Tell the user what was logged based on the tool result
+2. Provide a friendly displayName - a clean, human-readable name like "Banana", "Grilled Chicken Breast", "Greek Yogurt" (NOT technical names like "Bananas, raw" or "Chicken, broilers or fryers, breast")
+3. ALWAYS provide your best estimated macros (estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat) as backup in case the USDA lookup fails
+4. After the tool returns successfully, ask the user to confirm: "Does this look right?" or "Sound good?" or similar short confirmation question
+
+IMPORTANT - Adding more food to the draft:
+- When a user says "with X", "and X", "also had X", or "add X" - ONLY call the tool for the NEW item X
+- The previous items are already in the confirmation card from earlier tool calls - do NOT look them up again
+- Example: You looked up "turkey sandwich", user says "and a big mac" → ONLY call tool for "big mac" (turkey sandwich is already in the card)
+
+CORRECTIONS:
+- If they say "actually it was X" or "no, I meant X" - they want to REPLACE. Call the tool for the new item only.
+- "remove the X" or "delete X" → Tell them to tap the X button on that item to remove it
+- "2 servings" or quantity changes → Call the tool again with the updated quantity
 
 Your estimates should be reasonable per-serving values. For example:
 - Medium banana: ~105 cal, 1g protein, 27g carbs, 0.4g fat
@@ -362,7 +374,8 @@ Your estimates should be reasonable per-serving values. For example:
 - Cup of rice: ~205 cal, 4g protein, 45g carbs, 0.4g fat
 - Apple: ~95 cal, 0.5g protein, 25g carbs, 0.3g fat
 
-Keep responses short and friendly. Example: "Got it! Logged 1 medium banana - 105 cal, 1.3g protein, 27g carbs, 0.4g fat."
+Keep responses short and friendly. After the tool lookup, just ask for confirmation - don't repeat all the macros since they'll see them in the confirmation card.
+Example: "Found it! Does this look right?"
 
 If the user asks about their progress or totals, just say you've logged what they mentioned and they can check the home screen.`,
   });
