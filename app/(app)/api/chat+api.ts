@@ -8,46 +8,12 @@ import {
 const USDA_API_KEY = process.env.USDA_API_KEY;
 const USDA_BASE_URL = 'https://api.nal.usda.gov/fdc/v1';
 
-// ============================================
-// In-Memory Caching (persists across requests)
-// ============================================
-
-type CachedFood = {
-  data: USDAFoodFull;
-  cachedAt: number;
-};
-
-type CachedSearch = {
-  fdcId: number;
-  description: string;
-  cachedAt: number;
-};
-
-const foodCache = new Map<number, CachedFood>();
-const searchCache = new Map<string, CachedSearch>();
-const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-/**
- * Normalize search query for consistent caching
- * - lowercase, trim whitespace
- * - remove articles (a, an, the)
- * - collapse multiple spaces
- */
-function normalizeQuery(query: string): string {
-  return query
-    .toLowerCase()
-    .trim()
-    .replace(/\b(a|an|the)\b/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 /**
  * Enhance query for better USDA search results
  * Adds "raw" suffix for whole foods that benefit from it
  */
 function enhanceQuery(query: string): string {
-  const normalized = normalizeQuery(query);
+  const normalized = query.toLowerCase().trim().replace(/\s+/g, ' ');
 
   // Skip if already has preparation method
   if (/\b(raw|cooked|fried|baked|grilled|roasted|steamed|boiled)\b/i.test(normalized)) {
@@ -126,89 +92,136 @@ export async function POST(req: Request) {
           }
 
           try {
-            // Normalize and enhance query for better results
+            // Enhance query for better results
             const enhancedQuery = enhanceQuery(foodQuery);
-            const cacheKey = normalizeQuery(foodQuery);
 
-            // Check search cache first
-            let fdcId: number | undefined;
-            let cachedDescription: string | undefined;
-            const cachedSearch = searchCache.get(cacheKey);
+            // Search USDA - include Survey (FNDDS) for prepared/mixed foods
+            console.log('[LOOKUP] Searching USDA:', enhancedQuery);
+            const searchParams = new URLSearchParams({
+              api_key: USDA_API_KEY,
+              query: enhancedQuery,
+              pageSize: '5',
+              dataType: 'Survey (FNDDS),Foundation,SR Legacy',
+            });
+            const searchRes = await fetch(`${USDA_BASE_URL}/foods/search?${searchParams}`);
 
-            if (cachedSearch && Date.now() - cachedSearch.cachedAt < CACHE_TTL) {
-              fdcId = cachedSearch.fdcId;
-              cachedDescription = cachedSearch.description;
-              console.log('[LOOKUP] Search cache HIT:', cacheKey, '->', fdcId);
-            } else {
-              // Search USDA
-              console.log('[LOOKUP] Search cache MISS, querying:', enhancedQuery);
-              const searchParams = new URLSearchParams({
-                api_key: USDA_API_KEY,
-                query: enhancedQuery,
-                pageSize: '1',
-                dataType: 'Foundation,SR Legacy',
-              });
-              const searchRes = await fetch(`${USDA_BASE_URL}/foods/search?${searchParams}`);
-              const searchData = await searchRes.json() as USDASearchResponse;
-
-              if (!searchData.foods?.length) {
-                if (llmFallback) {
-                  console.log('[LOOKUP] No USDA results, using LLM estimate:', llmFallback);
-                  return {
-                    success: true,
-                    entry: {
-                      name: displayName,
-                      quantity,
-                      serving: { amount: 1, unit: 'serving', gramWeight: 100 },
-                      nutrients: llmFallback,
-                      meal,
-                    },
-                    estimated: true,
-                    message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
-                  };
-                }
-                // No results and no LLM estimate - return failure so LLM can retry with estimates
-                console.log('[LOOKUP] No USDA results and no estimates provided');
+            // Handle non-OK responses
+            if (!searchRes.ok) {
+              console.log('[LOOKUP] USDA search failed:', searchRes.status, searchRes.statusText);
+              if (llmFallback) {
+                console.log('[LOOKUP] Using LLM estimate:', llmFallback);
                 return {
-                  success: false,
-                  error: 'Food not found in USDA database. Please provide estimated macros.',
-                  foodQuery,
-                  message: `Could not find "${foodQuery}" in database. Please provide your best estimate for calories, protein, carbs, and fat.`,
+                  success: true,
+                  entry: {
+                    name: displayName,
+                    quantity,
+                    serving: { amount: 1, unit: 'serving', gramWeight: 100 },
+                    nutrients: llmFallback,
+                    meal,
+                  },
+                  estimated: true,
+                  message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
                 };
               }
-
-              fdcId = searchData.foods[0].fdcId;
-              cachedDescription = searchData.foods[0].description;
-
-              // Cache the search result
-              searchCache.set(cacheKey, {
-                fdcId,
-                description: cachedDescription,
-                cachedAt: Date.now(),
-              });
-              console.log('[LOOKUP] Cached search:', cacheKey, '->', fdcId);
+              throw new Error(`USDA API error: ${searchRes.status}`);
             }
 
-            // Check food cache
-            let food: USDAFoodFull;
-            const cachedFood = foodCache.get(fdcId);
+            const searchData = await searchRes.json() as USDASearchResponse;
 
-            if (cachedFood && Date.now() - cachedFood.cachedAt < CACHE_TTL) {
-              food = cachedFood.data;
-              console.log('[LOOKUP] Food cache HIT:', fdcId);
-            } else {
-              // Get full details from API
-              console.log('[LOOKUP] Food cache MISS, fetching:', fdcId);
-              const detailRes = await fetch(`${USDA_BASE_URL}/food/${fdcId}?api_key=${USDA_API_KEY}`);
-              food = await detailRes.json() as USDAFoodFull;
-
-              // Cache the food details
-              foodCache.set(fdcId, {
-                data: food,
-                cachedAt: Date.now(),
+            // Log all results for debugging
+            if (searchData.foods?.length) {
+              console.log('[LOOKUP] Search results:');
+              searchData.foods.slice(0, 5).forEach((f, i) => {
+                console.log(`  ${i + 1}. [${f.dataType}] ${f.description} (score: ${f.score})`);
               });
-              console.log('[LOOKUP] Cached food:', fdcId, food.description);
             }
+
+            if (!searchData.foods?.length) {
+              if (llmFallback) {
+                console.log('[LOOKUP] No USDA results, using LLM estimate:', llmFallback);
+                return {
+                  success: true,
+                  entry: {
+                    name: displayName,
+                    quantity,
+                    serving: { amount: 1, unit: 'serving', gramWeight: 100 },
+                    nutrients: llmFallback,
+                    meal,
+                  },
+                  estimated: true,
+                  message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
+                };
+              }
+              // No results and no LLM estimate - return failure so LLM can retry with estimates
+              console.log('[LOOKUP] No USDA results and no estimates provided');
+              return {
+                success: false,
+                error: 'Food not found in USDA database. Please provide estimated macros.',
+                foodQuery,
+                message: `Could not find "${foodQuery}" in database. Please provide your best estimate for calories, protein, carbs, and fat.`,
+              };
+            }
+
+            // Find the best matching result - prefer results that contain query words
+            const queryWords = enhancedQuery.toLowerCase().split(' ').filter(w => w.length > 2);
+            let bestMatch = searchData.foods[0];
+            let bestMatchCount = 0;
+
+            for (const food of searchData.foods) {
+              const desc = food.description.toLowerCase();
+              const matchCount = queryWords.filter(w => desc.includes(w)).length;
+
+              if (matchCount > bestMatchCount) {
+                bestMatch = food;
+                bestMatchCount = matchCount;
+              }
+            }
+
+            // If no query words match the best result, prefer LLM estimate
+            if (bestMatchCount === 0 && llmFallback) {
+              console.log('[LOOKUP] No good USDA match, using LLM estimate:', llmFallback);
+              return {
+                success: true,
+                entry: {
+                  name: displayName,
+                  quantity,
+                  serving: { amount: 1, unit: 'serving', gramWeight: 100 },
+                  nutrients: llmFallback,
+                  meal,
+                },
+                estimated: true,
+                message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
+              };
+            }
+
+            const fdcId = bestMatch.fdcId;
+            console.log('[LOOKUP] Selected:', bestMatch.description, '(fdcId:', fdcId, ')');
+
+            // Get full details from API
+            const detailRes = await fetch(`${USDA_BASE_URL}/food/${fdcId}?api_key=${USDA_API_KEY}`);
+
+            if (!detailRes.ok) {
+              console.log('[LOOKUP] USDA detail fetch failed:', detailRes.status, detailRes.statusText);
+              if (llmFallback) {
+                console.log('[LOOKUP] Using LLM estimate:', llmFallback);
+                return {
+                  success: true,
+                  entry: {
+                    name: displayName,
+                    quantity,
+                    serving: { amount: 1, unit: 'serving', gramWeight: 100 },
+                    nutrients: llmFallback,
+                    meal,
+                  },
+                  estimated: true,
+                  message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
+                };
+              }
+              throw new Error(`USDA API error: ${detailRes.status}`);
+            }
+
+            const food = await detailRes.json() as USDAFoodFull;
+            console.log('[LOOKUP] Fetched food:', food.description);
 
             // Extract macros - handle multiple nutrient ID formats
             // SR Legacy uses: nutrientId + value
