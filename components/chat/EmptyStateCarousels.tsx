@@ -2,7 +2,7 @@ import { colors } from '@/constants/colors'
 import { BlurView } from 'expo-blur'
 import { GlassView } from 'expo-glass-effect'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useCallback, useEffect } from 'react'
+import { memo, useCallback, useEffect } from 'react'
 import { Haptics } from 'react-native-nitro-haptics'
 import { StyleSheet, useColorScheme, View } from 'react-native'
 import MaskedView from '@react-native-masked-view/masked-view'
@@ -26,7 +26,7 @@ type CarouselCardProps = {
   onPress: (text: string) => void
 }
 
-function CarouselCard({ item, onPress }: CarouselCardProps) {
+const CarouselCard = memo(function CarouselCard({ item, onPress }: CarouselCardProps) {
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
 
@@ -52,7 +52,7 @@ function CarouselCard({ item, onPress }: CarouselCardProps) {
       </Text>
     </GlassView>
   )
-}
+})
 
 type SingleCarouselProps = {
   items: CarouselItem[]
@@ -60,7 +60,7 @@ type SingleCarouselProps = {
   onSelectItem: (text: string) => void
 }
 
-function SingleCarousel({ items, reverse = false, onSelectItem }: SingleCarouselProps) {
+const SingleCarousel = memo(function SingleCarousel({ items, reverse = false, onSelectItem }: SingleCarouselProps) {
   // Triple the items for seamless looping
   const tripledItems = [...items, ...items, ...items]
   const totalWidth = items.length * (ESTIMATED_AVG_CARD_WIDTH + CARD_GAP)
@@ -69,36 +69,36 @@ function SingleCarousel({ items, reverse = false, onSelectItem }: SingleCarousel
 
   useEffect(() => {
     const targetValue = reverse ? 0 : -totalWidth
-    translateX.value = withRepeat(
+    translateX.set(withRepeat(
       withTiming(targetValue, {
         duration: SCROLL_DURATION,
         easing: Easing.linear,
       }),
       -1, // infinite
       false // don't reverse
-    )
+    ))
   }, [reverse, totalWidth, translateX])
 
   // Reset position when reaching boundary for seamless loop
   useAnimatedReaction(
-    () => translateX.value,
+    () => translateX.get(),
     (currentValue) => {
       if (reverse) {
         // Moving right (reverse direction)
         if (currentValue >= 0) {
-          translateX.value = -totalWidth
+          translateX.set(-totalWidth)
         }
       } else {
         // Moving left (normal direction)
         if (currentValue <= -totalWidth) {
-          translateX.value = 0
+          translateX.set(0)
         }
       }
     }
   )
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
+    transform: [{ translateX: translateX.get() }],
   }))
 
   return (
@@ -114,7 +114,7 @@ function SingleCarousel({ items, reverse = false, onSelectItem }: SingleCarousel
       </Animated.View>
     </View>
   )
-}
+})
 
 type EmptyStateCarouselsProps = {
   onSelectItem: (text: string) => void

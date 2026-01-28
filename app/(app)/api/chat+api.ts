@@ -53,8 +53,10 @@ export async function POST(req: Request) {
           estimatedProtein: z.number().optional().describe('Your estimated protein (g) per serving if USDA lookup fails'),
           estimatedCarbs: z.number().optional().describe('Your estimated carbs (g) per serving if USDA lookup fails'),
           estimatedFat: z.number().optional().describe('Your estimated fat (g) per serving if USDA lookup fails'),
+          estimatedFiber: z.number().optional().describe('Your estimated fiber (g) per serving if USDA lookup fails'),
+          estimatedSugar: z.number().optional().describe('Your estimated sugar (g) per serving if USDA lookup fails'),
         }),
-        execute: async ({ foodQuery, displayName, quantity = 1, meal, estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat }) => {
+        execute: async ({ foodQuery, displayName, quantity = 1, meal, estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat, estimatedFiber, estimatedSugar }) => {
           console.log('[LOOKUP] Searching for:', foodQuery);
 
           // LLM-provided fallback macros (per serving)
@@ -64,6 +66,8 @@ export async function POST(req: Request) {
             protein: Math.round((estimatedProtein ?? 5) * 10) / 10,
             carbs: Math.round((estimatedCarbs ?? 15) * 10) / 10,
             fat: Math.round((estimatedFat ?? 3) * 10) / 10,
+            fiber: Math.round((estimatedFiber ?? 0) * 10) / 10,
+            sugar: Math.round((estimatedSugar ?? 0) * 10) / 10,
           } : null;
 
           if (!USDA_API_KEY) {
@@ -320,9 +324,12 @@ export async function POST(req: Request) {
               protein: Math.round(macros.protein * scale * 10) / 10,
               carbs: Math.round(macros.carbs * scale * 10) / 10,
               fat: Math.round(macros.fat * scale * 10) / 10,
+              fiber: Math.round(macros.fiber * scale * 10) / 10,
+              sugar: Math.round(macros.sugar * scale * 10) / 10,
             };
 
             console.log('[LOOKUP] Final entry:', displayName, nutrients.calories, 'cal per', serving.unit);
+            console.log('[LOOKUP] Macros:', nutrients);
 
             return {
               success: true,
@@ -334,6 +341,7 @@ export async function POST(req: Request) {
                 meal,
                 fdcId,
               },
+              estimated: false,
               message: `Logged ${quantity} ${serving.unit} ${displayName} - ${nutrients.calories * quantity} cal, ${nutrients.protein * quantity}g protein`,
             };
           } catch (error) {
@@ -368,7 +376,7 @@ export async function POST(req: Request) {
 When a user says they ate something (like "I had a banana" or "ate chicken for lunch"):
 1. Use the lookup_and_log_food tool with the food name
 2. Provide a friendly displayName - a clean, human-readable name like "Banana", "Grilled Chicken Breast", "Greek Yogurt" (NOT technical names like "Bananas, raw" or "Chicken, broilers or fryers, breast")
-3. ALWAYS provide your best estimated macros (estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat) as backup in case the USDA lookup fails
+3. ALWAYS provide your best estimated macros (estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat, estimatedFiber, estimatedSugar) as backup in case the USDA lookup fails
 4. After the tool returns successfully, ask the user to confirm: "Does this look right?" or "Sound good?" or similar short confirmation question
 
 IMPORTANT - Adding more food to the draft:
@@ -382,10 +390,10 @@ CORRECTIONS:
 - "2 servings" or quantity changes → Call the tool again with the updated quantity
 
 Your estimates should be reasonable per-serving values. For example:
-- Medium banana: ~105 cal, 1g protein, 27g carbs, 0.4g fat
-- Chicken breast (4oz): ~185 cal, 35g protein, 0g carbs, 4g fat
-- Cup of rice: ~205 cal, 4g protein, 45g carbs, 0.4g fat
-- Apple: ~95 cal, 0.5g protein, 25g carbs, 0.3g fat
+- Medium banana: ~105 cal, 1g protein, 27g carbs, 0.4g fat, 3g fiber, 14g sugar
+- Chicken breast (4oz): ~185 cal, 35g protein, 0g carbs, 4g fat, 0g fiber, 0g sugar
+- Cup of rice: ~205 cal, 4g protein, 45g carbs, 0.4g fat, 0.6g fiber, 0g sugar
+- Apple: ~95 cal, 0.5g protein, 25g carbs, 0.3g fat, 4g fiber, 19g sugar
 
 Keep responses short and friendly. After the tool lookup, just ask for confirmation - don't repeat all the macros since they'll see them in the confirmation card.
 Example: "Found it! Does this look right?"

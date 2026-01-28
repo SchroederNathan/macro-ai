@@ -1,4 +1,4 @@
-import { AnimatedInput, type AnimatedInputRef, EmptyStateCarousels, FoodConfirmationCard, type FoodConfirmationEntry, MAX_INPUT_HEIGHT, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
+import { AnimatedInput, type AnimatedInputRef, EmptyStateCarousels, FoodConfirmationCard, type FoodConfirmationEntry, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
 import { colors } from '@/constants/colors'
 import { generateAPIUrl } from '@/utils'
 import { useDailyLogStore, useUserStore } from '@/stores'
@@ -18,6 +18,40 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
+
+/** Generate a creative meal title from food names */
+async function generateMealTitle(foodNames: string[]): Promise<string | null> {
+  try {
+    const url = generateAPIUrl('/api/meal-title')
+    console.log('[MEAL TITLE] Fetching:', url)
+
+    const response = await expoFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ foodNames }),
+    })
+
+    // Check if response is ok before parsing
+    if (!response.ok) {
+      console.error('[MEAL TITLE] Response not ok:', response.status, response.statusText)
+      return null
+    }
+
+    const text = await response.text()
+    console.log('[MEAL TITLE] Raw response:', text)
+
+    try {
+      const data = JSON.parse(text)
+      return data.title || null
+    } catch {
+      console.error('[MEAL TITLE] Failed to parse JSON:', text)
+      return null
+    }
+  } catch (error) {
+    console.error('[MEAL TITLE] Error generating title:', error)
+    return null
+  }
+}
 
 /** Animated spacer that adjusts height based on keyboard */
 function KeyboardSpacer({ keyboardHeight, baseHeight }: { keyboardHeight: SharedValue<number>, baseHeight: number }) {
@@ -43,12 +77,13 @@ export default function ChatScreen() {
     toolState: null,
     foodQuery: null,
   })
-  const [pendingEntries, setPendingEntries] = useState<Array<{
+  const [pendingEntries, setPendingEntries] = useState<{
     toolCallId: string
     entry: FoodConfirmationEntry
-  }>>([])
+  }[]>([])
   const [showCard, setShowCard] = useState(false)
-  const [inputFocused, setInputFocused] = useState(false)
+  const [mealTitle, setMealTitle] = useState<string | null>(null)
+  const [isTitleLoading, setIsTitleLoading] = useState(false)
   const prevMessageCountRef = useRef(0)
   const processedToolCallsRef = useRef<Set<string>>(new Set())
   const listRef = useRef<FlashListRef<UIMessage>>(null)
@@ -60,15 +95,15 @@ export default function ChatScreen() {
   // Keyboard animation for content padding
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation()
 
-  // Zustand stores
-  const dailyLogStore = useDailyLogStore()
-  const userStore = useUserStore()
+  // Zustand stores - destructure functions for stable references
+  const { load: loadDailyLog, addEntry } = useDailyLogStore()
+  const { load: loadUserStore } = useUserStore()
 
   // Load stores on mount
   useEffect(() => {
-    dailyLogStore.load()
-    userStore.load()
-  }, [])
+    loadDailyLog()
+    loadUserStore()
+  }, [loadDailyLog, loadUserStore])
 
   const { messages, error, sendMessage } = useChat({
     transport: new DefaultChatTransport({
@@ -154,6 +189,7 @@ export default function ChatScreen() {
         if (partAny.state === 'output-available' && partAny.output) {
           const result = partAny.output as {
             success?: boolean
+            estimated?: boolean
             entry?: {
               name: string
               quantity: number
@@ -179,6 +215,7 @@ export default function ChatScreen() {
                 nutrients: result.entry.nutrients,
                 meal: result.entry.meal,
                 fdcId: result.entry.fdcId,
+                estimated: result.estimated,
               },
             }])
 
@@ -189,17 +226,14 @@ export default function ChatScreen() {
     }
   }, [messages])
 
-  // Base bottom padding: input height + safe area + some margin + card height if visible
+  // Base bottom padding: input height + safe area + some margin
   const cardVisible = showCard || pendingEntries.length > 0
-  const cardHeight = cardVisible ? 200 : 0 // Approximate card height
-  const baseBottomPadding = MIN_INPUT_HEIGHT + insets.bottom + 40 + cardHeight
+  const baseBottomPadding = MIN_INPUT_HEIGHT + insets.bottom + 40
 
-  // Scroll to bottom helper
+  // Scroll to bottom helper - no deps on messages.length for stable reference
   const scrollToBottom = useCallback((animated = true) => {
-    if (listRef.current && messages.length > 0) {
-      listRef.current.scrollToEnd({ animated })
-    }
-  }, [messages.length])
+    listRef.current?.scrollToEnd({ animated })
+  }, [])
 
 
   // Track when assistant responds with actual TEXT content (not just tool activity)
@@ -228,7 +262,7 @@ export default function ChatScreen() {
     }
   }, [messages.length, scrollToBottom])
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     if (!input.trim()) return
     setIsThinking(true)
     setToolActivity({ toolName: null, toolState: null, foodQuery: null })
@@ -237,7 +271,7 @@ export default function ChatScreen() {
     requestAnimationFrame(() => {
       scrollToBottom(true)
     })
-  }
+  }, [input, sendMessage, scrollToBottom])
 
   const handleCarouselSelect = useCallback((text: string) => {
     setIsThinking(true)
@@ -260,13 +294,14 @@ export default function ChatScreen() {
 
     // Add all entries to daily log store
     for (const pending of pendingEntries) {
-      const entry = dailyLogStore.addEntry({
+      const entry = addEntry({
         quantity: pending.entry.quantity,
         snapshot: {
           name: pending.entry.name,
           serving: pending.entry.serving,
           nutrients: pending.entry.nutrients,
           fdcId: pending.entry.fdcId,
+          estimated: pending.entry.estimated,
         },
         meal: pending.entry.meal || getDefaultMeal(),
       })
@@ -275,13 +310,41 @@ export default function ChatScreen() {
 
     setPendingEntries([])
     setShowCard(false)
-  }, [pendingEntries, dailyLogStore])
+    setMealTitle(null)
+    setIsTitleLoading(false)
+  }, [pendingEntries, addEntry])
 
   // Handle removing a specific entry from the pending list
   const handleRemoveEntry = useCallback((index: number) => {
     Haptics.selection()
     setPendingEntries(prev => prev.filter((_, i) => i !== index))
   }, [])
+
+  // Handle quantity changes from edit mode
+  const handleQuantityChange = useCallback((index: number, newQuantity: number) => {
+    if (newQuantity < 1) {
+      handleRemoveEntry(index)
+    } else {
+      setPendingEntries(prev => prev.map((p, i) =>
+        i === index ? { ...p, entry: { ...p.entry, quantity: newQuantity } } : p
+      ))
+    }
+  }, [handleRemoveEntry])
+
+  // Generate meal title when entries change (2+ items)
+  useEffect(() => {
+    if (pendingEntries.length >= 2) {
+      setIsTitleLoading(true)
+      generateMealTitle(pendingEntries.map(e => e.entry.name))
+        .then(title => {
+          setMealTitle(title)
+          setIsTitleLoading(false)
+        })
+    } else {
+      setMealTitle(null)
+      setIsTitleLoading(false)
+    }
+  }, [pendingEntries])
 
   // Show activity indicator while thinking or tool is active
   const showActivityIndicator = isThinking || (toolActivity.toolName && toolActivity.toolState !== 'output-available')
@@ -300,15 +363,37 @@ export default function ChatScreen() {
           />
         </View>
       )}
+
+      {/* Food confirmation card - now part of scroll content */}
+      {cardVisible && (
+        <View className="py-4">
+          <FoodConfirmationCard
+            entries={pendingEntries.map(p => p.entry)}
+            mealTitle={mealTitle}
+            isTitleLoading={isTitleLoading}
+            onConfirm={handleConfirmLog}
+            onRemove={handleRemoveEntry}
+            onQuantityChange={handleQuantityChange}
+          />
+        </View>
+      )}
+
       {/* Spacer that grows with keyboard to keep content above it */}
       <KeyboardSpacer keyboardHeight={keyboardHeight} baseHeight={baseBottomPadding} />
     </>
-  ), [showActivityIndicator, toolActivity, keyboardHeight, baseBottomPadding, isThinking])
+  ), [showActivityIndicator, toolActivity, keyboardHeight, baseBottomPadding, isThinking, cardVisible, pendingEntries, mealTitle, isTitleLoading, handleConfirmLog, handleRemoveEntry, handleQuantityChange])
 
-  // Animated style for floating card above input
-  const cardAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: keyboardHeight.value }],
-  }))
+  // Scroll to bottom when card becomes visible
+  useEffect(() => {
+    if (cardVisible) {
+      requestAnimationFrame(() => {
+        scrollToBottom(false)
+        setTimeout(() => {
+          scrollToBottom(false)
+        }, 16)
+      })
+    }
+  }, [cardVisible, scrollToBottom])
 
   if (error) return <Text>{error.message}</Text>
 
@@ -343,32 +428,6 @@ export default function ChatScreen() {
         />
       </Pressable>
 
-      {/* Food confirmation card - pinned above input */}
-      {cardVisible && (
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              // When focused (keyboard open): inputHeight + containerPadding(12) + margin(16)
-              // When unfocused (keyboard closed): inputHeight + insets.bottom + containerPadding(12) + margin(16)
-              bottom: inputFocused
-                ? MAX_INPUT_HEIGHT + 28
-                : MIN_INPUT_HEIGHT + insets.bottom + 28,
-              left: 0,
-              right: 0,
-              zIndex: 25
-            },
-            cardAnimatedStyle,
-          ]}
-        >
-          <FoodConfirmationCard
-            entries={pendingEntries.map(p => p.entry)}
-            onConfirm={handleConfirmLog}
-            onRemove={handleRemoveEntry}
-          />
-        </Animated.View>
-      )}
-
       {/* Floating input - positioned over content with keyboard animation */}
       <AnimatedInput
         ref={inputRef}
@@ -377,7 +436,6 @@ export default function ChatScreen() {
         onSend={handleSend}
         hasMessages={messages.length > 0}
         keyboardHeight={keyboardHeight}
-        onFocusChange={setInputFocused}
       />
       <LinearGradient
         colors={[

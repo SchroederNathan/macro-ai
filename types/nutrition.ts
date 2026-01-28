@@ -28,6 +28,7 @@ export type FoodSnapshot = {
   nutrients: MacroTotals;
   fdcId?: number;
   rawUsda?: unknown;
+  estimated?: boolean;  // true if LLM estimate, false/undefined if from USDA
 };
 
 /** Individual food log entry */

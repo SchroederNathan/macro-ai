@@ -62,12 +62,12 @@ const AnimatedChar: FC<AnimatedCharProps> = ({ index, char, progress, totalCount
 
     return withDelay(
       delayMs,
-      withSpring(progress.value, {
+      withSpring(progress.get(), {
         damping: 100,
         stiffness: 1400,
       })
     )
-  }, [])
+  }, [index, progress])
 
   const rContainerStyle = useAnimatedStyle(() => {
     const p = charProgress.get()
@@ -106,19 +106,19 @@ function ShimmerOverlay({ width, height, color }: { width: number; height: numbe
 
   useEffect(() => {
     if (width > 0) {
-      translateX.value = withRepeat(
+      translateX.set(withRepeat(
         withSequence(
           withTiming(-width, { duration: 0 }),
           withTiming(width, { duration: 1500, easing: Easing.inOut(Easing.ease) })
         ),
         -1,
         false
-      )
+      ))
     }
-  }, [width])
+  }, [width, translateX])
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
+    transform: [{ translateX: translateX.get() }],
   }))
 
   const transparentColor = hexToTransparent(color)
@@ -161,7 +161,7 @@ export function ToolActivityIndicator({ isThinking, toolName, toolState, foodQue
       prevTextRef.current = text
       // Animate in
       setTimeout(() => {
-        progress.value = 1
+        progress.set(1)
       }, 50)
       return
     }
@@ -179,7 +179,7 @@ export function ToolActivityIndicator({ isThinking, toolName, toolState, foodQue
     isTransitioning.current = true
 
     // Fade out
-    progress.value = withTiming(0, { duration: 150 })
+    progress.set(withTiming(0, { duration: 150 }))
 
     // Update text after fade out, then stagger in
     setTimeout(() => {
@@ -187,11 +187,11 @@ export function ToolActivityIndicator({ isThinking, toolName, toolState, foodQue
       prevTextRef.current = text
 
       setTimeout(() => {
-        progress.value = 1
+        progress.set(1)
         isTransitioning.current = false
       }, 50)
     }, 180)
-  }, [text])
+  }, [text, progress])
 
   if (!text) return null
 

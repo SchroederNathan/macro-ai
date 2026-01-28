@@ -1,20 +1,20 @@
 import { Text } from '@/components/ui/Text'
 import type { UIMessage } from 'ai'
-import { useCallback } from 'react'
+import { memo, useCallback } from 'react'
 import { Linking, View } from 'react-native'
-import { EnrichedMarkdownText } from 'react-native-enriched-markdown'
+import { EnrichedMarkdownText, type LinkPressEvent } from 'react-native-enriched-markdown'
 import { useMarkdownStyle } from './useMarkdownStyle'
 
 type MessageBubbleProps = {
   message: UIMessage
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const markdownStyle = useMarkdownStyle()
 
-  const handleLinkPress = useCallback((url: string) => {
-    Linking.openURL(url)
+  const handleLinkPress = useCallback((event: LinkPressEvent) => {
+    Linking.openURL(event.url)
   }, [])
 
   return (
@@ -34,7 +34,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   key={`${message.id}-${i}`}
                   markdown={part.text}
                   markdownStyle={markdownStyle}
-                  onLinkPress={(event) => handleLinkPress(event.url)}
+                  onLinkPress={handleLinkPress}
                 />
               )
           }
@@ -42,4 +42,4 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </View>
     </View>
   )
-}
+})

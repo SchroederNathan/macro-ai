@@ -1,31 +1,49 @@
-import { Text } from '@/components/ui/Text'
 import { AnimatedValue } from '@/components/ui/AnimatedValue'
+import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
 import { GlassView } from 'expo-glass-effect'
+import { Minus, Plus, X } from 'lucide-react-native'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
-import { X } from 'lucide-react-native'
 import Animated, {
   FadeIn,
+  FadeInUp,
   FadeOut,
-  FadeInDown,
-  FadeOutUp,
+  FadeOutDown,
   LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from 'react-native-reanimated'
+import { ShimmerText } from './ShimmerText'
+
+const entryLayoutTransition = LinearTransition.springify()
+
+const MACRO_COLORS = {
+  carbs: '#FBBF24',   // Yellow/amber
+  fat: '#3B82F6',     // Blue
+  protein: '#22C55E', // Green
+  fiber: '#A855F7',   // Purple
+}
 
 export type FoodConfirmationEntry = {
   name: string
   quantity: number
   serving: { amount: number; unit: string; gramWeight: number }
-  nutrients: { calories: number; protein: number; carbs: number; fat: number }
+  nutrients: { calories: number; protein: number; carbs: number; fat: number; fiber?: number }
   meal?: 'breakfast' | 'lunch' | 'dinner' | 'snack'
   fdcId?: number
+  estimated?: boolean
 }
 
 type FoodConfirmationCardProps = {
   entries: FoodConfirmationEntry[]
+  mealTitle?: string | null
+  isTitleLoading?: boolean
   onConfirm: () => void
   onRemove: (index: number) => void
+  onQuantityChange?: (index: number, newQuantity: number) => void
 }
 
 function getDefaultMeal(): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
@@ -42,49 +60,266 @@ function formatMealName(meal: string): string {
 
 function formatServing(quantity: number, serving: { amount: number; unit: string }): string {
   const total = quantity * serving.amount
-  // If it's just "1 serving" or similar, simplify
   if (total === 1 && serving.unit.toLowerCase() === 'serving') {
     return '1 serving'
   }
   return `${total} ${serving.unit}`
 }
 
-export function FoodConfirmationCard({ entries, onConfirm, onRemove }: FoodConfirmationCardProps) {
+// Animated macro bar segment
+type MacroSegmentProps = {
+  percent: number
+  color: string
+  position: 'first' | 'middle' | 'last'
+}
+
+function MacroSegment({ percent, color, position }: MacroSegmentProps) {
+  const width = useSharedValue(0)
+
+  useEffect(() => {
+    width.value = withSpring(percent)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [percent])
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    flex: width.value,
+  }))
+
+  const borderRadius = position === 'first'
+    ? { borderTopLeftRadius: 8, borderBottomLeftRadius: 8, borderTopRightRadius: 4, borderBottomRightRadius: 4 }
+    : position === 'last'
+      ? { borderTopLeftRadius: 4, borderBottomLeftRadius: 4, borderTopRightRadius: 8, borderBottomRightRadius: 8 }
+      : { borderRadius: 4 }
+
+  return (
+    <Animated.View
+      style={[
+        animatedStyle,
+      ]}
+    >
+      <GlassView
+        tintColor={color}
+        isInteractive={true}
+        style={
+
+          {
+            height: 24,
+            ...borderRadius,
+          }}
+      />
+    </Animated.View >)
+}
+
+// Segmented macro bar component
+type SegmentedMacroBarProps = {
+  carbs: number
+  fat: number
+  protein: number
+  fiber: number
+}
+
+function SegmentedMacroBar({ carbs, fat, protein, fiber }: SegmentedMacroBarProps) {
+  // Calculate by caloric contribution (protein 4cal/g, carbs 4cal/g, fat 9cal/g)
+  const carbsCals = carbs * 4
+  const fatCals = fat * 9
+  const proteinCals = protein * 4
+  const totalMacroCals = carbsCals + fatCals + proteinCals
+
+  // Each as percentage of total caloric contribution
+  const carbsPercent = totalMacroCals > 0 ? (carbsCals / totalMacroCals) * 100 : 33
+  const fatPercent = totalMacroCals > 0 ? (fatCals / totalMacroCals) * 100 : 33
+  const proteinPercent = totalMacroCals > 0 ? (proteinCals / totalMacroCals) * 100 : 33
+
+  // Fiber gets fixed 8% since 0 calories, normalize others to remaining 92%
+  const fiberPercent = 8
+  const normFactor = 0.92
+
+  return (
+    <View style={{ flexDirection: 'row', height: 24, gap: 3 }}>
+      <MacroSegment percent={carbsPercent * normFactor} color={MACRO_COLORS.carbs} position="first" />
+      <MacroSegment percent={fatPercent * normFactor} color={MACRO_COLORS.fat} position="middle" />
+      <MacroSegment percent={proteinPercent * normFactor} color={MACRO_COLORS.protein} position="middle" />
+      <MacroSegment percent={fiberPercent} color={MACRO_COLORS.fiber} position="last" />
+    </View>
+  )
+}
+
+// Macro detail item
+type MacroDetailProps = {
+  label: string
+  value: number
+  color: string
+}
+
+function MacroDetail({ label, value, color }: MacroDetailProps) {
+  return (
+    <View className="">
+      <View className="flex-row items-center gap-1.5 mb-0.5">
+        <View style={{ backgroundColor: color, width: 8, height: 8, borderRadius: 4 }} />
+        <Text className="text-muted text-sm">{label}</Text>
+      </View>
+      <View className="flex-row items-end gap-1">
+        <AnimatedValue value={value} className="text-foreground text-3xl font-semibold" />
+        <AnimatedValue value="g" className="text-muted text-xl mb-1.25" />
+      </View>
+    </View>
+  )
+}
+
+// Edit mode entry row
+type EditEntryRowProps = {
+  entry: FoodConfirmationEntry
+  index: number
+  themeColor: string
+  onRemove: (index: number) => void
+  onQuantityChange: (index: number, newQuantity: number) => void
+}
+
+const EditEntryRow = memo(function EditEntryRow({
+  entry,
+  index,
+  themeColor,
+  onRemove,
+  onQuantityChange,
+}: EditEntryRowProps) {
+  const handleRemove = useCallback(() => {
+    Haptics.selection()
+    onRemove(index)
+  }, [index, onRemove])
+
+  const handleDecrement = useCallback(() => {
+    Haptics.selection()
+    onQuantityChange(index, entry.quantity - 1)
+  }, [index, entry.quantity, onQuantityChange])
+
+  const handleIncrement = useCallback(() => {
+    Haptics.selection()
+    onQuantityChange(index, entry.quantity + 1)
+  }, [index, entry.quantity, onQuantityChange])
+
+  return (
+    <Animated.View
+      entering={FadeInUp.duration(250)}
+      exiting={FadeOutDown.duration(150)}
+      layout={entryLayoutTransition}
+      className="flex-row items-center py-2"
+      style={{ borderTopWidth: index > 0 ? 1 : 0, borderTopColor: themeColor + '30' }}
+    >
+      <View className="flex-1 mr-2">
+        <Text className="text-foreground text-base font-medium" numberOfLines={1}>
+          {entry.name}
+        </Text>
+        <Text className="text-muted text-base">
+          {formatServing(1, entry.serving)}
+        </Text>
+      </View>
+
+      {/* Quantity controls */}
+      <View className="flex-row items-center gap-2 mr-3">
+        <Pressable
+          onPress={handleDecrement}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          className="w-7 h-7 items-center justify-center rounded-full bg-muted/20"
+        >
+          <Minus size={14} color={themeColor} />
+        </Pressable>
+        <Text className="text-foreground text-base font-semibold w-6 text-center">
+          {entry.quantity}
+        </Text>
+        <Pressable
+          onPress={handleIncrement}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          className="w-7 h-7 items-center justify-center rounded-full bg-muted/20"
+        >
+          <Plus size={14} color={themeColor} />
+        </Pressable>
+      </View>
+
+      {/* Remove button */}
+      <Pressable
+        onPress={handleRemove}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        className="w-7 h-7 items-center justify-center rounded-full bg-red-500/20"
+      >
+        <X size={14} color="#EF4444" />
+      </Pressable>
+    </Animated.View>
+  )
+})
+
+export function FoodConfirmationCard({
+  entries,
+  mealTitle,
+  isTitleLoading,
+  onConfirm,
+  onRemove,
+  onQuantityChange,
+}: FoodConfirmationCardProps) {
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
   const theme = isDark ? colors.dark : colors.light
+  const [isEditMode, setIsEditMode] = useState(false)
 
   const isEmpty = entries.length === 0
-
-  // Use first entry's meal or default
   const meal = entries[0]?.meal || getDefaultMeal()
 
-  // Calculate totals across all entries
-  const totals = entries.reduce(
-    (acc, entry) => ({
-      calories: acc.calories + entry.nutrients.calories * entry.quantity,
-      protein: acc.protein + entry.nutrients.protein * entry.quantity,
-      carbs: acc.carbs + entry.nutrients.carbs * entry.quantity,
-      fat: acc.fat + entry.nutrients.fat * entry.quantity,
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  )
+  // Calculate totals
+  const { totalCalories, totalProtein, totalCarbs, totalFat, totalFiber } = useMemo(() => {
+    const totals = entries.reduce(
+      (acc, entry) => ({
+        calories: acc.calories + entry.nutrients.calories * entry.quantity,
+        protein: acc.protein + entry.nutrients.protein * entry.quantity,
+        carbs: acc.carbs + entry.nutrients.carbs * entry.quantity,
+        fat: acc.fat + entry.nutrients.fat * entry.quantity,
+        fiber: acc.fiber + (entry.nutrients.fiber || 0) * entry.quantity,
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
+    )
+    return {
+      totalCalories: Math.round(totals.calories),
+      totalProtein: Math.round(totals.protein),
+      totalCarbs: Math.round(totals.carbs),
+      totalFat: Math.round(totals.fat),
+      totalFiber: Math.round(totals.fiber),
+    }
+  }, [entries])
 
-  const totalCalories = Math.round(totals.calories)
-  const totalProtein = Math.round(totals.protein * 10) / 10
-  const totalCarbs = Math.round(totals.carbs * 10) / 10
-  const totalFat = Math.round(totals.fat * 10) / 10
+  // Default meal name based on entries
+  const defaultMealName = useMemo(() => {
+    if (entries.length === 0) return formatMealName(meal)
+    if (entries.length === 1) return entries[0].name
+    return formatMealName(meal)
+  }, [entries, meal])
 
-  const handleConfirm = () => {
+  const displayTitle = mealTitle || defaultMealName
+
+  const handleConfirm = useCallback(() => {
     if (isEmpty) return
     Haptics.selection()
     onConfirm()
-  }
+  }, [isEmpty, onConfirm])
 
-  const handleRemove = (index: number) => {
+  const toggleEditMode = useCallback(() => {
     Haptics.selection()
+    setIsEditMode(prev => !prev)
+  }, [])
+
+  const handleQuantityChange = useCallback((index: number, newQuantity: number) => {
+    if (onQuantityChange) {
+      onQuantityChange(index, newQuantity)
+    }
+  }, [onQuantityChange])
+
+  const handleRemove = useCallback((index: number) => {
     onRemove(index)
-  }
+  }, [onRemove])
+
+  // Exit edit mode when entries become empty
+  useEffect(() => {
+    if (entries.length === 0) {
+      setIsEditMode(false)
+    }
+  }, [entries.length])
 
   return (
     <View className="px-4">
@@ -94,106 +329,118 @@ export function FoodConfirmationCard({ entries, onConfirm, onRemove }: FoodConfi
           borderRadius: 20,
           borderCurve: 'continuous',
           padding: 16,
+
         }}
       >
-        {/* Food items or empty state */}
-        {isEmpty ? (
+        {/* Header: Title + Edit */}
+        <Animated.View layout={entryLayoutTransition} className="flex-row justify-between items-center mb-8">
+          {isEmpty ? (
+            <Text className="text-muted text-lg">Add food to continue...</Text>
+          ) : (
+            <View className="flex-1 mr-2">
+              {isTitleLoading ? (
+                <ShimmerText
+                  className="text-foreground text-lg font-semibold"
+                  highlightColor={theme.muted}
+                >
+                  Generating title...
+                </ShimmerText>
+              ) : (
+                <AnimatedValue
+                  value={displayTitle}
+                  className="text-foreground text-lg font-semibold"
+                />
+              )}
+            </View>
+          )}
+          {/* {!isEmpty && (
+            <Pressable onPress={toggleEditMode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text className="text-primary text-base font-medium">
+                {isEditMode ? 'Done' : 'Edit'}
+              </Text>
+            </Pressable>
+          )} */}
+        </Animated.View>
+
+        {/* Large Calories */}
+        {!isEmpty && (
+          <Animated.View layout={entryLayoutTransition} className=" mb-8 flex-row items-end gap-2">
+            <AnimatedValue
+              value={totalCalories}
+              className="text-foreground text-5xl font-bold"
+            />
+            <Text className="text-muted text-xl mb-2">kcal</Text>
+          </Animated.View>
+        )}
+
+        {/* Segmented Macro Bar */}
+        {!isEmpty && (
+          <Animated.View layout={entryLayoutTransition} className="mb-4">
+            <SegmentedMacroBar
+              carbs={totalCarbs}
+              fat={totalFat}
+              protein={totalProtein}
+              fiber={totalFiber}
+            />
+          </Animated.View>
+        )}
+
+        {/* Macro Detail Row */}
+        {!isEmpty && (
+          <Animated.View layout={entryLayoutTransition} className="flex-row justify-between mb-8">
+            <MacroDetail label="Carbs" value={totalCarbs} color={MACRO_COLORS.carbs} />
+            <MacroDetail label="Fats" value={totalFat} color={MACRO_COLORS.fat} />
+            <MacroDetail label="Protein" value={totalProtein} color={MACRO_COLORS.protein} />
+            <MacroDetail label="Fiber" value={totalFiber} color={MACRO_COLORS.fiber} />
+          </Animated.View>
+        )}
+
+        {/* Edit Mode: Entry List */}
+        {isEditMode && !isEmpty && (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
-            className="py-2"
+            layout={entryLayoutTransition}
+            className="mb-8"
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: theme.border,
+              paddingTop: 8,
+            }}
           >
-            <Text className="text-muted text-base text-center">
-              Add food to continue...
-            </Text>
+            {entries.map((entry, index) => (
+              <EditEntryRow
+                key={`${entry.name}-${entry.fdcId ?? index}`}
+                entry={entry}
+                index={index}
+                themeColor={theme.muted}
+                onRemove={handleRemove}
+                onQuantityChange={handleQuantityChange}
+              />
+            ))}
           </Animated.View>
-        ) : (
-          entries.map((entry, index) => (
-            <Animated.View
-              key={`${entry.name}-${entry.fdcId ?? index}`}
-              entering={FadeInDown.duration(250)}
-              exiting={FadeOutUp.duration(200)}
-              layout={LinearTransition.springify().damping(20).stiffness(200)}
-              className={`flex-row items-center ${index > 0 ? 'mt-2' : ''}`}
-            >
-              <View className="flex-1">
-                <AnimatedValue
-                  value={entry.name}
-                  className="text-foreground text-lg font-semibold"
-                />
-                <Text className="text-muted text-sm">
-                  {formatServing(entry.quantity, entry.serving)}
-                  {index === 0 && `  •  ${formatMealName(meal)}`}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => handleRemove(index)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                className="ml-2 p-1"
-              >
-                <X size={18} color={theme.muted} />
-              </Pressable>
-            </Animated.View>
-          ))
         )}
 
-        {/* Divider */}
-        <View
-          className="my-3"
-          style={{ height: 1, backgroundColor: theme.border }}
-        />
-
-        {/* Macros row - show totals with animation */}
-        <View className="flex-row justify-between">
-          {/* Calories */}
-          <View className="items-center flex-1">
-            <AnimatedValue value={totalCalories} />
-            <Text className="text-muted text-xs">cal</Text>
-          </View>
-
-          {/* Protein */}
-          <View className="items-center flex-1">
-            <AnimatedValue value={totalProtein} suffix="g" />
-            <Text className="text-muted text-xs">Protein</Text>
-          </View>
-
-          {/* Carbs */}
-          <View className="items-center flex-1">
-            <AnimatedValue value={totalCarbs} suffix="g" />
-            <Text className="text-muted text-xs">Carbs</Text>
-          </View>
-
-          {/* Fat */}
-          <View className="items-center flex-1">
-            <AnimatedValue value={totalFat} suffix="g" />
-            <Text className="text-muted text-xs">Fat</Text>
-          </View>
-        </View>
-
-        {/* Divider */}
-        <View
-          className="my-3"
-          style={{ height: 1, backgroundColor: theme.border }}
-        />
-
-        {/* Log button (full width, disabled when empty) */}
-        <GlassView
-          style={{
-            borderRadius: 12,
-            borderCurve: 'continuous',
-            paddingVertical: 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: isEmpty ? 0.5 : 1,
-          }}
-          tintColor={isEmpty ? undefined : theme.primary}
-          isInteractive={!isEmpty}
-          onTouchEnd={handleConfirm}
-        >
-          <Text className={`text-base font-semibold ${isEmpty ? 'text-muted' : 'text-white'}`}>
-            Log
-          </Text>
-        </GlassView>
+        {/* Log Button */}
+        <Animated.View layout={entryLayoutTransition}>
+          <GlassView
+            style={{
+              borderRadius: 12,
+              borderCurve: 'continuous',
+              paddingVertical: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: isEmpty ? 0.5 : 1,
+            }}
+            tintColor={isEmpty ? undefined : theme.primary}
+            isInteractive={!isEmpty}
+            onTouchEnd={handleConfirm}
+          >
+            <Text className={`text-base font-semibold ${isEmpty ? 'text-muted' : 'text-white'}`}>
+              Log
+            </Text>
+          </GlassView>
+        </Animated.View>
       </GlassView>
     </View>
   )

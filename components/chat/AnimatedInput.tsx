@@ -1,5 +1,5 @@
 import { GlassContainer, GlassView } from 'expo-glass-effect'
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Dimensions, Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
@@ -75,7 +75,6 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
 
   const focusProgress = useSharedValue(0)
   const textProgress = useSharedValue(0)
-  const wasTextPresent = useRef(false)
 
   // Keyboard-aware positioning style
   const rKeyboardStyle = useAnimatedStyle(() => {
@@ -88,12 +87,11 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
     }
   })
 
-  // Animate button collapse when text changes
+  // Animate button collapse when text changes - using useEffect for proper change detection
   const hasText = inputValue.trim().length > 0
-  if (hasText !== wasTextPresent.current) {
-    wasTextPresent.current = hasText
-    textProgress.value = withSpring(hasText ? 1 : 0)
-  }
+  useEffect(() => {
+    textProgress.set(withSpring(hasText ? 1 : 0))
+  }, [hasText, textProgress])
 
   // Animated styles for collapsing buttons - each slides to mic position
   const gap = 8 // matches GlassContainer gap
