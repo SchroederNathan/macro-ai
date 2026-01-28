@@ -14,7 +14,7 @@ import { Dimensions, Keyboard, Pressable, useColorScheme, View } from 'react-nat
 import { Text } from '@/components/ui/Text'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import type { SharedValue } from 'react-native-reanimated'
-import Animated, { useAnimatedStyle } from 'react-native-reanimated'
+import Animated, { SlideInUp, useAnimatedStyle } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
@@ -402,9 +402,12 @@ export default function ChatScreen() {
       {/* Messages list - fills entire screen, content scrolls under input */}
       <Pressable className="absolute inset-0" onPress={Keyboard.dismiss}>
         {messages.length === 0 && (
-          <View style={{ paddingTop: headerHeight + 8 }}>
+          <Animated.View
+            entering={SlideInUp.springify().delay(100)}
+            style={{ paddingTop: headerHeight || (insets.top + 44) + 8 }}
+          >
             <EmptyStateCarousels onSelectItem={handleCarouselSelect} />
-          </View>
+          </Animated.View>
         )}
         <FlashList
           ref={listRef}

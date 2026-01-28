@@ -2,7 +2,7 @@ import { colors } from '@/constants/colors'
 import { BlurView } from 'expo-blur'
 import { GlassView } from 'expo-glass-effect'
 import { LinearGradient } from 'expo-linear-gradient'
-import { memo, useCallback, useEffect } from 'react'
+import { memo, useCallback } from 'react'
 import { Haptics } from 'react-native-nitro-haptics'
 import { StyleSheet, useColorScheme, View } from 'react-native'
 import MaskedView from '@react-native-masked-view/masked-view'
@@ -35,7 +35,6 @@ const CarouselCard = memo(function CarouselCard({ item, onPress }: CarouselCardP
     onPress(item.text)
   }, [item.text, onPress])
 
-
   return (
     <GlassView
       style={styles.card}
@@ -65,10 +64,14 @@ const SingleCarousel = memo(function SingleCarousel({ items, reverse = false, on
   const tripledItems = [...items, ...items, ...items]
   const totalWidth = items.length * (ESTIMATED_AVG_CARD_WIDTH + CARD_GAP)
 
-  const translateX = useSharedValue(reverse ? -totalWidth : 0)
+  // Initialize at the correct position immediately to prevent jump
+  const initialValue = reverse ? -totalWidth : 0
+  const targetValue = reverse ? 0 : -totalWidth
+  const translateX = useSharedValue(initialValue)
 
-  useEffect(() => {
-    const targetValue = reverse ? 0 : -totalWidth
+  // Start animation immediately using withRepeat from initial render
+  // The animation runs continuously - no useEffect needed
+  if (translateX.get() === initialValue) {
     translateX.set(withRepeat(
       withTiming(targetValue, {
         duration: SCROLL_DURATION,
@@ -77,7 +80,7 @@ const SingleCarousel = memo(function SingleCarousel({ items, reverse = false, on
       -1, // infinite
       false // don't reverse
     ))
-  }, [reverse, totalWidth, translateX])
+  }
 
   // Reset position when reaching boundary for seamless loop
   useAnimatedReaction(
@@ -128,7 +131,7 @@ export function EmptyStateCarousels({ onSelectItem }: EmptyStateCarouselsProps) 
   const bgColor = isDark ? colors.dark.background : colors.light.background
 
   return (
-    <View className="py-5">
+    <View className="py-5 relative">
       {carouselRows.map((row, index) => (
         <SingleCarousel
           key={index}
@@ -189,7 +192,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginRight: CARD_GAP,
+    marginRight: 12,
   },
   fadeLeft: {
     position: 'absolute',
