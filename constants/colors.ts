@@ -23,8 +23,8 @@ export const colors = {
   },
   dark: {
     background: '#0a0a0a',
-    foreground: '#fafafa',
-    primary: '#f97316',
+    foreground: '#f5f5f5',
+    primary: '#3b82f6',
     primaryBorder: '#fdba74',
     muted: '#a3a3a3',
     mutedForeground: '#404040',

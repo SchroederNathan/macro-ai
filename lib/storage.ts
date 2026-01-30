@@ -130,6 +130,14 @@ export function getAllLogDates(): string[] {
 }
 
 /**
+ * Get calories consumed for a specific date
+ */
+export function getCaloriesForDate(date: string): number {
+  const log = getDailyLog(date);
+  return log?.totals.calories ?? 0;
+}
+
+/**
  * Clear all app data (for reset functionality)
  */
 export function clearAllData(): void {

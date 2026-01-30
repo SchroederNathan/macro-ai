@@ -102,7 +102,7 @@ export const AnimatedValue: FC<AnimatedValueProps> = ({
     isTransitioning.current = true
 
     // Fade out
-    progress.value = withTiming(0, { duration: 150 })
+    progress.set(withTiming(0, { duration: 150 }))
 
     // Update text after fade out, then fade in
     setTimeout(() => {
@@ -110,11 +110,11 @@ export const AnimatedValue: FC<AnimatedValueProps> = ({
       prevValueRef.current = value
 
       setTimeout(() => {
-        progress.value = 1
+        progress.set(1)
         isTransitioning.current = false
       }, 50)
     }, 180)
-  }, [value, suffix])
+  }, [value, suffix, progress])
 
   const chars = displayValue.split('')
 

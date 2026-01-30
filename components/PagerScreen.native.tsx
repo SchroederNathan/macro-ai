@@ -16,7 +16,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 
-// Context to share scroll position with child screens
+// Context to share scroll position between PagerContent and header
 export const ScrollPositionContext = createContext<SharedValue<number> | null>(null)
 
 // Page indicator constants
@@ -32,36 +32,6 @@ const PILL_WIDTHS: Record<string, number> = {
 }
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView)
-
-const MAX_BLUR = 10
-
-type BlurredPageProps = {
-  pageIndex: number
-  scrollPosition: SharedValue<number>
-  children: React.ReactNode
-  colorScheme: ColorSchemeName
-}
-
-function BlurredPage({ pageIndex, scrollPosition, children, colorScheme }: BlurredPageProps) {
-  const animatedProps = useAnimatedProps(() => {
-    const distance = Math.abs(scrollPosition.value - pageIndex)
-    const intensity = Math.min(distance * MAX_BLUR, MAX_BLUR)
-    return { intensity }
-  })
-
-  return (
-    <View style={styles.pageContainer}>
-      {children}
-      <AnimatedBlurView
-        animatedProps={animatedProps}
-        style={StyleSheet.absoluteFill}
-        tint={colorScheme === 'dark' ? 'dark' : 'light'}
-        pointerEvents="none"
-      />
-    </View>
-  )
-}
 
 type PageIndicatorProps = {
   name: string
@@ -94,17 +64,17 @@ function PageIndicator({ name, pageIndex, scrollPosition }: PageIndicatorProps) 
 
   return (
     <AnimatedGlassView
+      isInteractive
       style={[
         {
           borderRadius: 999,
           alignItems: 'center',
           justifyContent: 'center',
-          overflow: 'hidden',
         },
         containerStyle,
       ]}
     >
-      <Animated.Text style={[{ color: 'white', fontSize: 14, fontWeight: '500' }, textStyle]}>
+      <Animated.Text className="text-white text-sm font-medium" style={textStyle}>
         {name}
       </Animated.Text>
     </AnimatedGlassView>
@@ -116,10 +86,41 @@ function AnimatedHeaderTitle() {
   if (!scrollPosition) return null
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+    <View className="flex-row items-center justify-center gap-2">
       {PAGE_NAMES.map((name, index) => (
         <PageIndicator key={name} name={name} pageIndex={index} scrollPosition={scrollPosition} />
       ))}
+    </View>
+  )
+}
+
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView)
+
+const MAX_BLUR = 10
+
+type BlurredPageProps = {
+  pageIndex: number
+  scrollPosition: SharedValue<number>
+  children: React.ReactNode
+  colorScheme: ColorSchemeName
+}
+
+function BlurredPage({ pageIndex, scrollPosition, children, colorScheme }: BlurredPageProps) {
+  const animatedProps = useAnimatedProps(() => {
+    const distance = Math.abs(scrollPosition.value - pageIndex)
+    const intensity = Math.min(distance * MAX_BLUR, MAX_BLUR)
+    return { intensity }
+  })
+
+  return (
+    <View className="flex-1 overflow-hidden">
+      {children}
+      <AnimatedBlurView
+        animatedProps={animatedProps}
+        style={StyleSheet.absoluteFill}
+        tint={colorScheme === 'dark' ? 'dark' : 'light'}
+        pointerEvents="none"
+      />
     </View>
   )
 }
@@ -186,18 +187,104 @@ function PagerContent({ scrollPosition }: { scrollPosition: SharedValue<number> 
   const colorScheme = useColorScheme()
   const lastHapticPosition = useRef<number | null>(null)
 
-  // Update header options when scroll position changes
-  useEffect(() => {
-    const updateHeader = () => {
-      const currentPage = Math.round(scrollPosition.value)
-      navigation.setOptions({
-        headerRight: currentPage === 1 ? () => null : undefined,
-      })
-    }
+  const handlePageSelected = useCallback((e: { nativeEvent: { position: number } }) => {
+    const page = e.nativeEvent.position
 
-    // Initial update
-    updateHeader()
-  }, [navigation, scrollPosition])
+    navigation.setOptions({
+      unstable_headerRightItems: () => {
+        if (page === 0) {
+          // Home page - calendar and gear
+          return [
+            {
+              type: 'menu',
+              label: 'Calendar',
+              icon: { type: 'sfSymbol', name: 'calendar' },
+              menu: {
+                title: 'Calendar',
+                items: [
+                  { type: 'action', label: 'Today', icon: { type: 'sfSymbol', name: 'sun.max' }, onPress: () => console.log('Today') },
+                  { type: 'action', label: 'This Week', icon: { type: 'sfSymbol', name: 'calendar.badge.clock' }, onPress: () => console.log('This Week') },
+                ],
+              },
+            },
+            {
+              type: 'menu',
+              label: 'Settings',
+              icon: { type: 'sfSymbol', name: 'gearshape' },
+              menu: {
+                title: 'Settings',
+                items: [
+                  { type: 'action', label: 'Goals', icon: { type: 'sfSymbol', name: 'target' }, onPress: () => console.log('Goals') },
+                  { type: 'action', label: 'Profile', icon: { type: 'sfSymbol', name: 'person.circle' }, onPress: () => console.log('Profile') },
+                ],
+              },
+            },
+          ]
+        } else if (page === 1) {
+          // Chat page - sparkles and ellipsis
+          return [
+            {
+              type: 'menu',
+              label: 'AI',
+              icon: { type: 'sfSymbol', name: 'sparkles' },
+              menu: {
+                title: 'AI Options',
+                items: [
+                  { type: 'action', label: 'New Chat', icon: { type: 'sfSymbol', name: 'plus.bubble' }, onPress: () => console.log('New Chat') },
+                  { type: 'action', label: 'Clear History', icon: { type: 'sfSymbol', name: 'trash' }, onPress: () => console.log('Clear') },
+                ],
+              },
+            },
+            {
+              type: 'menu',
+              label: 'More',
+              icon: { type: 'sfSymbol', name: 'ellipsis.circle' },
+              menu: {
+                title: 'More',
+                items: [
+                  { type: 'action', label: 'Share', icon: { type: 'sfSymbol', name: 'square.and.arrow.up' }, onPress: () => console.log('Share') },
+                  { type: 'action', label: 'Help', icon: { type: 'sfSymbol', name: 'questionmark.circle' }, onPress: () => console.log('Help') },
+                ],
+              },
+            },
+          ]
+        } else {
+          // History page - filter and chart
+          return [
+            {
+              type: 'menu',
+              label: 'Filter',
+              icon: { type: 'sfSymbol', name: 'line.3.horizontal.decrease.circle' },
+              menu: {
+                title: 'Filter',
+                items: [
+                  { type: 'action', label: 'All Time', icon: { type: 'sfSymbol', name: 'infinity' }, onPress: () => console.log('All Time') },
+                  { type: 'action', label: 'This Month', icon: { type: 'sfSymbol', name: 'calendar' }, onPress: () => console.log('This Month') },
+                ],
+              },
+            },
+            {
+              type: 'menu',
+              label: 'Stats',
+              icon: { type: 'sfSymbol', name: 'chart.bar' },
+              menu: {
+                title: 'Statistics',
+                items: [
+                  { type: 'action', label: 'Weekly Report', icon: { type: 'sfSymbol', name: 'doc.text' }, onPress: () => console.log('Weekly') },
+                  { type: 'action', label: 'Export Data', icon: { type: 'sfSymbol', name: 'arrow.down.doc' }, onPress: () => console.log('Export') },
+                ],
+              },
+            },
+          ]
+        }
+      },
+    })
+  }, [navigation])
+
+  // Set initial header for page 1 (Chat) on mount
+  useEffect(() => {
+    handlePageSelected({ nativeEvent: { position: 1 } })
+  }, [handlePageSelected])
 
   const handlePageScroll = useCallback((e: { nativeEvent: PagerViewOnPageScrollEventData }) => {
     const { position, offset } = e.nativeEvent
@@ -206,7 +293,7 @@ function PagerContent({ scrollPosition }: { scrollPosition: SharedValue<number> 
     const effectivePosition = position + offset
 
     // Update shared value for blur animation
-    scrollPosition.value = effectivePosition
+    scrollPosition.set(effectivePosition)
 
     // Round to nearest 0.5 to detect crossing the halfway point
     const roundedHalf = Math.round(effectivePosition * 2) / 2
@@ -224,30 +311,29 @@ function PagerContent({ scrollPosition }: { scrollPosition: SharedValue<number> 
   }, [scrollPosition])
 
   return (
-    <>
-      <PagerView
-        ref={pagerRef}
-        style={{ flex: 1 }}
-        initialPage={1}
-        onPageScroll={handlePageScroll}
-      >
-        <View key="home" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={0} scrollPosition={scrollPosition} colorScheme={colorScheme}>
-            <HomeScreen />
-          </BlurredPage>
-        </View>
-        <View key="chat" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={1} scrollPosition={scrollPosition} colorScheme={colorScheme}>
-            <ChatScreen />
-          </BlurredPage>
-        </View>
-        <View key="history" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={2} scrollPosition={scrollPosition} colorScheme={colorScheme}>
-            <HistoryScreen />
-          </BlurredPage>
-        </View>
-      </PagerView>
-    </>
+    <PagerView
+      ref={pagerRef}
+      style={{ flex: 1, backgroundColor: 'transparent' }}
+      initialPage={1}
+      onPageScroll={handlePageScroll}
+      onPageSelected={handlePageSelected}
+    >
+      <View key="home" className="flex-1">
+        <BlurredPage pageIndex={0} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <HomeScreen />
+        </BlurredPage>
+      </View>
+      <View key="chat" className="flex-1">
+        <BlurredPage pageIndex={1} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <ChatScreen />
+        </BlurredPage>
+      </View>
+      <View key="history" className="flex-1">
+        <BlurredPage pageIndex={2} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <HistoryScreen />
+        </BlurredPage>
+      </View>
+    </PagerView>
   )
 }
 
@@ -270,24 +356,7 @@ export default function PagerScreen() {
                   headerShadowVisible: false,        // iOS: hide bottom shadow
                   headerBlurEffect: undefined,
                   headerTitle: () => <AnimatedHeaderTitle />,
-
                   contentStyle: { backgroundColor: 'transparent' },
-                  unstable_headerRightItems: () => {
-                    return [
-                      {
-                        type: 'menu',
-                        label: 'Sparkles',
-                        icon: { type: 'sfSymbol', name: 'sparkles' },
-                        menu: {
-                          title: 'Calendar',
-                          items: [
-                            { type: 'action', label: 'Today', icon: { type: 'sfSymbol', name: 'sun.max' }, onPress: () => console.log('Today') },
-                            { type: 'action', label: 'This Week', icon: { type: 'sfSymbol', name: 'calendar.badge.clock' }, onPress: () => console.log('This Week') },
-                          ],
-                        },
-                      },
-                    ]
-                  },
                 }}
               >
                 {() => <PagerContent scrollPosition={scrollPosition} />}
@@ -301,8 +370,3 @@ export default function PagerScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  pageContainer: {
-    flex: 1,
-  },
-})

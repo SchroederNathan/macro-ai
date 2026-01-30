@@ -43,7 +43,8 @@ export default function CalorieTracker({ eaten, target }: CalorieTrackerProps) {
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke={theme.border}
+              stroke={theme.foreground}
+              strokeOpacity={0.1}
               strokeWidth={strokeWidth}
               fill="transparent"
               strokeDasharray={`${arcLength} ${gapLength}`}
@@ -54,7 +55,7 @@ export default function CalorieTracker({ eaten, target }: CalorieTrackerProps) {
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke={theme.primary}
+              stroke={theme.foreground}
               strokeWidth={strokeWidth}
               fill="transparent"
               strokeDasharray={`${progressArcLength} ${circumference}`}

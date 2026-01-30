@@ -1,6 +1,6 @@
 import { GlassContainer, GlassView } from 'expo-glass-effect'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Dimensions, Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
+import { Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
   interpolate,
@@ -13,9 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { StaggeredText } from '@/components/ui/StaggeredText'
 import { colors } from '@/constants/colors'
-import { LinearGradient } from 'expo-linear-gradient'
 import { ArrowUp, Camera, Mic, ScanBarcode } from 'lucide-react-native'
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 export type AnimatedInputRef = {
   focus: () => void
@@ -35,8 +33,6 @@ const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
 
 export const MIN_INPUT_HEIGHT = 56
 export const MAX_INPUT_HEIGHT = 112
-
-const SCREEN_WIDTH = Dimensions.get('window').width
 
 export type AnimatedInputProps = TextInputProps & {
   onSend: (text: string) => void
@@ -71,7 +67,7 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
 
   // Tint colors for glass effect
   const containerTint = isDark ? '#27272a' : '#f4f4f5'
-  const buttonTint = isDark ? '#ff6900' : '#2563eb'
+  const buttonTint = isDark ? colors.dark.primary : '#2563eb'
 
   const focusProgress = useSharedValue(0)
   const textProgress = useSharedValue(0)

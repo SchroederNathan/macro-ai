@@ -10,14 +10,13 @@ import { DefaultChatTransport } from 'ai'
 import { fetch as expoFetch } from 'expo/fetch'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Haptics } from 'react-native-nitro-haptics'
-import { Dimensions, Keyboard, Pressable, useColorScheme, View } from 'react-native'
+import { Keyboard, Pressable, useColorScheme, View } from 'react-native'
 import { Text } from '@/components/ui/Text'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import type { SharedValue } from 'react-native-reanimated'
 import Animated, { SlideInUp, useAnimatedStyle } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 /** Generate a creative meal title from food names */
 async function generateMealTitle(foodNames: string[]): Promise<string | null> {
@@ -60,8 +59,6 @@ function KeyboardSpacer({ keyboardHeight, baseHeight }: { keyboardHeight: Shared
   }))
   return <Animated.View style={animatedStyle} />
 }
-
-const SCREEN_WIDTH = Dimensions.get('window').width
 
 type ToolActivity = {
   toolName: string | null
@@ -398,7 +395,7 @@ export default function ChatScreen() {
   if (error) return <Text>{error.message}</Text>
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1">
       {/* Messages list - fills entire screen, content scrolls under input */}
       <Pressable className="absolute inset-0" onPress={Keyboard.dismiss}>
         {messages.length === 0 && (
@@ -445,18 +442,8 @@ export default function ChatScreen() {
           isDark ? colors.dark.background + '00' : colors.light.background + '00',
           isDark ? colors.dark.background : colors.light.background
         ]}
-
         style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, zIndex: 0 }}
       />
-      <Svg style={{ position: 'absolute', bottom: 0, left: 0, right: 0, width: SCREEN_WIDTH,  zIndex: 10,  height: 100 }}>
-        <Defs>
-          <RadialGradient id="grad" cx="50%" cy="100%" r="100%">
-            <Stop offset="0%" stopColor={isDark ? colors.dark.primary : colors.light.primary} stopOpacity="0.3" />
-            <Stop offset="100%" stopColor={isDark ? colors.dark.background : colors.light.background} stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#grad)" />
-      </Svg>
     </View>
   )
 }

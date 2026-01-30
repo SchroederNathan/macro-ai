@@ -1,11 +1,11 @@
+import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
-import { BlurView } from 'expo-blur'
-import { GlassView } from 'expo-glass-effect'
-import { LinearGradient } from 'expo-linear-gradient'
-import { memo, useCallback } from 'react'
-import { Haptics } from 'react-native-nitro-haptics'
-import { StyleSheet, useColorScheme, View } from 'react-native'
 import MaskedView from '@react-native-masked-view/masked-view'
+import { GlassView } from 'expo-glass-effect'
+import { memo, useCallback, useEffect, useState } from 'react'
+import { StyleSheet, useColorScheme, useWindowDimensions, View } from 'react-native'
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg'
+import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
   Easing,
   useAnimatedReaction,
@@ -14,7 +14,6 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
-import { Text } from '@/components/ui/Text'
 import { carouselRows, type CarouselItem } from './carouselData'
 
 const CARD_GAP = 12
@@ -69,9 +68,8 @@ const SingleCarousel = memo(function SingleCarousel({ items, reverse = false, on
   const targetValue = reverse ? 0 : -totalWidth
   const translateX = useSharedValue(initialValue)
 
-  // Start animation immediately using withRepeat from initial render
-  // The animation runs continuously - no useEffect needed
-  if (translateX.get() === initialValue) {
+  // Start animation in useEffect to avoid side effects during render
+  useEffect(() => {
     translateX.set(withRepeat(
       withTiming(targetValue, {
         duration: SCROLL_DURATION,
@@ -80,7 +78,7 @@ const SingleCarousel = memo(function SingleCarousel({ items, reverse = false, on
       -1, // infinite
       false // don't reverse
     ))
-  }
+  }, [reverse, totalWidth, targetValue, translateX])
 
   // Reset position when reaching boundary for seamless loop
   useAnimatedReaction(
@@ -125,13 +123,30 @@ type EmptyStateCarouselsProps = {
 
 const FADE_WIDTH = 40
 
-export function EmptyStateCarousels({ onSelectItem }: EmptyStateCarouselsProps) {
-  const colorScheme = useColorScheme()
-  const isDark = colorScheme === 'dark'
-  const bgColor = isDark ? colors.dark.background : colors.light.background
+function FadeMask({ width, height }: { width: number; height: number }) {
+  const fadePercent = (FADE_WIDTH / width) * 100
 
   return (
-    <View className="py-5 relative">
+    <Svg width={width} height={height}>
+      <Defs>
+        <SvgLinearGradient id="fadeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <Stop offset="0%" stopColor="black" stopOpacity={0} />
+          <Stop offset={`${fadePercent}%`} stopColor="black" stopOpacity={1} />
+          <Stop offset={`${100 - fadePercent}%`} stopColor="black" stopOpacity={1} />
+          <Stop offset="100%" stopColor="black" stopOpacity={0} />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect x={0} y={0} width={width} height={height} fill="url(#fadeGradient)" />
+    </Svg>
+  )
+}
+
+export function EmptyStateCarousels({ onSelectItem }: EmptyStateCarouselsProps) {
+  const { width } = useWindowDimensions()
+  const [contentHeight, setContentHeight] = useState(0)
+
+  const content = (
+    <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
       {carouselRows.map((row, index) => (
         <SingleCarousel
           key={index}
@@ -140,44 +155,21 @@ export function EmptyStateCarousels({ onSelectItem }: EmptyStateCarouselsProps) 
           onSelectItem={onSelectItem}
         />
       ))}
-      {/* Left fade with blur */}
+    </View>
+  )
+
+  if (contentHeight === 0) {
+    // Render invisibly to measure
+    return <View className="py-5" style={{ opacity: 0 }}>{content}</View>
+  }
+
+  return (
+    <View className="py-5">
       <MaskedView
-        style={[styles.fadeLeft, { width: FADE_WIDTH }]}
-        maskElement={
-          <LinearGradient
-            colors={['#000', 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.flex1}
-          />
-        }
+        style={{ width, height: contentHeight }}
+        maskElement={<FadeMask width={width} height={contentHeight} />}
       >
-        <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={styles.flex1} />
-        <LinearGradient
-          colors={[bgColor, bgColor + '00']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.absoluteFill}
-        />
-      </MaskedView>
-      {/* Right fade with blur */}
-      <MaskedView
-        style={[styles.fadeRight, { width: FADE_WIDTH }]}
-        maskElement={
-          <LinearGradient
-            colors={['transparent', '#000']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.flex1}
-          />
-        }
-      >
-        <LinearGradient
-          colors={[bgColor + '00', bgColor]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.absoluteFill}
-        />
+        {content}
       </MaskedView>
     </View>
   )
@@ -193,29 +185,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 12,
-  },
-  fadeLeft: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    pointerEvents: 'none',
-  },
-  fadeRight: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    pointerEvents: 'none',
-  },
-  flex1: {
-    flex: 1,
-  },
-  absoluteFill: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
   },
 })

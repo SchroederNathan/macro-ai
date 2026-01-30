@@ -10,11 +10,11 @@
 @layer theme {
     :root {
         @variant dark {
-            --color-background: oklch(14.5% 0 0);
-            --color-foreground: oklch(98.5% 0 0);
-            --color-primary: oklch(70.5% 0.213 47.604);
+            --color-background: #0a0a0a;
+            --color-foreground: #f5f5f5;
+            --color-primary: #3b82f6;
             --color-primary-border: oklch(75% 0.183 55.934);
-            --color-muted: oklch(70.8% 0 0);
+            --color-muted: #a3a3a3;
             --color-chat: oklch(20.5% 0 0);
             --color-muted-foreground: oklch(26.9% 0 0);
             --color-card: oklch(18.5% 0 0);

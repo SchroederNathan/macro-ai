@@ -77,7 +77,7 @@ function MacroSegment({ percent, color, position }: MacroSegmentProps) {
   const width = useSharedValue(0)
 
   useEffect(() => {
-    width.value = withSpring(percent)
+    width.set(withSpring(percent))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [percent])
 
@@ -298,11 +298,6 @@ export function FoodConfirmationCard({
     Haptics.selection()
     onConfirm()
   }, [isEmpty, onConfirm])
-
-  const toggleEditMode = useCallback(() => {
-    Haptics.selection()
-    setIsEditMode(prev => !prev)
-  }, [])
 
   const handleQuantityChange = useCallback((index: number, newQuantity: number) => {
     if (onQuantityChange) {

@@ -77,7 +77,7 @@ export const StaggeredText: FC<StaggeredTextProps> = ({
     if (visible) {
       // Show initial text
       const showTimeout = setTimeout(() => {
-        progress.value = 1
+        progress.set(1)
       }, 100)
 
       // Start cycling through phrases
@@ -86,7 +86,7 @@ export const StaggeredText: FC<StaggeredTextProps> = ({
         isTransitioning.current = true
 
         // Fade out
-        progress.value = withTiming(0, { duration: 200 })
+        progress.set(withTiming(0, { duration: 200 }))
 
         // Update text after fade out
         setTimeout(() => {
@@ -94,7 +94,7 @@ export const StaggeredText: FC<StaggeredTextProps> = ({
 
           // Fade in after text update
           setTimeout(() => {
-            progress.value = 1
+            progress.set(1)
             isTransitioning.current = false
           }, 50)
         }, 250)
@@ -108,14 +108,14 @@ export const StaggeredText: FC<StaggeredTextProps> = ({
         }
       }
     } else {
-      progress.value = 0
+      progress.set(0)
       setCurrentIndex(0)
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
     }
-  }, [visible, phrases.length, intervalMs])
+  }, [visible, phrases.length, intervalMs, progress])
 
   if (!visible) return null
 
