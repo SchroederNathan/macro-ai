@@ -1,10 +1,21 @@
 import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
 import ChatScreen from '@/screens/ChatScreen'
+import FoodBreakdownScreen from '@/screens/FoodBreakdownScreen'
 import HistoryScreen from '@/screens/HistoryScreen'
 import HomeScreen from '@/screens/HomeScreen'
 import { NavigationContainer, NavigationIndependentTree } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import type { FoodConfirmationEntry } from '@/components/chat'
+
+// Type definitions for navigation
+export type ChatStackParamList = {
+  ChatScreen: undefined
+  FoodBreakdown: {
+    entries: FoodConfirmationEntry[]
+    mealTitle: string | null
+  }
+}
 import { BlurView } from 'expo-blur'
 import { useCallback, useRef } from 'react'
 import { ColorSchemeName, StyleSheet, useColorScheme, View } from 'react-native'
