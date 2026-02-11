@@ -7,6 +7,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { BlurView } from 'expo-blur'
 import { GlassView } from 'expo-glass-effect'
 import { MeshGradientView } from 'expo-mesh-gradient'
+import { Stack } from 'expo-router'
 import { createContext, useCallback, useContext, useEffect, useRef } from 'react'
 import { ColorSchemeName, Dimensions, StyleSheet, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -272,32 +273,29 @@ export default function PagerScreen() {
                   headerTitle: () => <AnimatedHeaderTitle />,
 
                   contentStyle: { backgroundColor: 'transparent' },
-                  unstable_headerRightItems: () => {
-                    return [
-                      {
-                        type: 'menu',
-                        label: 'Sparkles',
-                        icon: { type: 'sfSymbol', name: 'sparkles' },
-                        menu: {
-                          title: 'Calendar',
-                          items: [
-                            { type: 'action', label: 'Today', icon: { type: 'sfSymbol', name: 'sun.max' }, onPress: () => console.log('Today') },
-                            { type: 'action', label: 'This Week', icon: { type: 'sfSymbol', name: 'calendar.badge.clock' }, onPress: () => console.log('This Week') },
-                          ],
-                        },
-                      },
-                    ]
-                  },
                 }}
               >
-                {() => <PagerContent scrollPosition={scrollPosition} />}
+                {() => {
+                  return (
+                    <>
+                      <Stack.Toolbar placement="right" >
+                        <Stack.Toolbar.Menu>
+                          <Stack.Toolbar.Icon sf="sparkles" />
+                          <Stack.Toolbar.Label>Test menui</Stack.Toolbar.Label>
+                          <Stack.Toolbar.MenuAction onPress={() => { }}>Action 1</Stack.Toolbar.MenuAction>
+                        </Stack.Toolbar.Menu>
+                      </Stack.Toolbar>
+                      <PagerContent scrollPosition={scrollPosition} />
+                    </>
+                  )
+                }}
               </AppStack.Screen>
             </AppStack.Navigator>
           </NavigationContainer>
         </NavigationIndependentTree>
         <AnimatedChatGradient scrollPosition={scrollPosition} />
       </View>
-    </ScrollPositionContext.Provider>
+    </ScrollPositionContext.Provider >
   )
 }
 
