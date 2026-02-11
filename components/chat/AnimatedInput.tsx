@@ -1,5 +1,5 @@
 import { GlassContainer, GlassView } from 'expo-glass-effect'
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, type ReactNode, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
@@ -7,7 +7,8 @@ import Animated, {
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
-  withSpring
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -31,6 +32,22 @@ const BUTTON_SIZE = 40
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
 
+const topContentEntering = (values: any) => {
+  'worklet'
+  return {
+    initialValues: { transform: [{ translateY: values.targetHeight }] },
+    animations: { transform: [{ translateY: withSpring(0) }] },
+  }
+}
+
+const topContentExiting = (values: any) => {
+  'worklet'
+  return {
+    initialValues: { transform: [{ translateY: 0 }] },
+    animations: { transform: [{ translateY: withSpring(values.currentHeight) }] },
+  }
+}
+
 export const MIN_INPUT_HEIGHT = 56
 export const MAX_INPUT_HEIGHT = 112
 
@@ -41,10 +58,12 @@ export type AnimatedInputProps = TextInputProps & {
   keyboardHeight?: SharedValue<number>
   /** Called when input focus changes */
   onFocusChange?: (focused: boolean) => void
+  /** Content rendered above the input, anchored to its top edge */
+  topContent?: ReactNode
 }
 
 export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(function AnimatedInput(
-  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, ...textInputProps },
+  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, topContent, ...textInputProps },
   ref
 ) {
   const [value, setValue] = useState('')
@@ -156,10 +175,25 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
 
       className="px-3"
     >
+      {topContent && (
+        <Animated.View
+          entering={topContentEntering}
+          exiting={topContentExiting}
+          style={{ zIndex: -1 }}
+          className="px-1"
+        >
+          {topContent}
+        </Animated.View>
+      )}
       <Pressable className='z-10' onPress={() => textInputRef.current?.focus()}>
         <AnimatedGlassView
           style={[
-            { borderCurve: 'continuous', borderRadius: MIN_INPUT_HEIGHT / 2 },
+            {
+              borderCurve: 'continuous',
+
+              borderRadius: MIN_INPUT_HEIGHT / 2
+
+            },
             rInputContainerStyle,
           ]}
 
@@ -275,6 +309,6 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
         </AnimatedGlassView>
       </Pressable>
 
-    </Animated.View>
+    </Animated.View >
   )
 })

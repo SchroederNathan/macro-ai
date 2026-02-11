@@ -225,7 +225,13 @@ export default function ChatScreen() {
 
   // Base bottom padding: input height + safe area + some margin
   const cardVisible = showCard || pendingEntries.length > 0
-  const baseBottomPadding = MIN_INPUT_HEIGHT + insets.bottom + 40
+  const [cardHeight, setCardHeight] = useState(0)
+  const baseBottomPadding = MIN_INPUT_HEIGHT + insets.bottom + 40 + cardHeight
+
+  // Reset card height when card hides
+  useEffect(() => {
+    if (!cardVisible) setCardHeight(0)
+  }, [cardVisible])
 
   // Scroll to bottom helper - no deps on messages.length for stable reference
   const scrollToBottom = useCallback((animated = true) => {
@@ -361,24 +367,10 @@ export default function ChatScreen() {
         </View>
       )}
 
-      {/* Food confirmation card - now part of scroll content */}
-      {cardVisible && (
-        <View className="py-4">
-          <FoodConfirmationCard
-            entries={pendingEntries.map(p => p.entry)}
-            mealTitle={mealTitle}
-            isTitleLoading={isTitleLoading}
-            onConfirm={handleConfirmLog}
-            onRemove={handleRemoveEntry}
-            onQuantityChange={handleQuantityChange}
-          />
-        </View>
-      )}
-
       {/* Spacer that grows with keyboard to keep content above it */}
       <KeyboardSpacer keyboardHeight={keyboardHeight} baseHeight={baseBottomPadding} />
     </>
-  ), [showActivityIndicator, toolActivity, keyboardHeight, baseBottomPadding, isThinking, cardVisible, pendingEntries, mealTitle, isTitleLoading, handleConfirmLog, handleRemoveEntry, handleQuantityChange])
+  ), [showActivityIndicator, toolActivity, keyboardHeight, baseBottomPadding, isThinking])
 
   // Scroll to bottom when card becomes visible
   useEffect(() => {
@@ -436,6 +428,18 @@ export default function ChatScreen() {
         onSend={handleSend}
         hasMessages={messages.length > 0}
         keyboardHeight={keyboardHeight}
+        topContent={cardVisible ? (
+          <View onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}>
+            <FoodConfirmationCard
+              entries={pendingEntries.map(p => p.entry)}
+              mealTitle={mealTitle}
+              isTitleLoading={isTitleLoading}
+              onConfirm={handleConfirmLog}
+              onRemove={handleRemoveEntry}
+              onQuantityChange={handleQuantityChange}
+            />
+          </View>
+        ) : undefined}
       />
       <LinearGradient
         colors={[

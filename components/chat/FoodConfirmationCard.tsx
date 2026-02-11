@@ -317,14 +317,17 @@ export function FoodConfirmationCard({
   }, [entries.length])
 
   return (
-    <View className="px-4">
+    <View className="mx-1 -mb-2">
       <GlassView
         isInteractive
         style={{
-          borderRadius: 20,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
           borderCurve: 'continuous',
           padding: 16,
-
+          paddingBottom: 24,
         }}
       >
         {/* Header: Title + Edit */}

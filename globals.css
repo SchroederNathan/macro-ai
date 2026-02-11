@@ -19,7 +19,7 @@
             --color-muted-foreground: oklch(26.9% 0 0);
             --color-card: oklch(18.5% 0 0);
             --color-border: oklch(26.9% 0 0);
-            --color-user-bubble: oklch(55.3% 0.195 38.402);
+            --color-user-bubble: #1e3a8a;
 
         }
 
