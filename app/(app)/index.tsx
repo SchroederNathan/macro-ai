@@ -100,10 +100,10 @@ function PageIndicator({ name, pageIndex, scrollPosition }: PageIndicatorProps) 
           borderRadius: 999,
           alignItems: 'center',
           justifyContent: 'center',
-          overflow: 'hidden',
         },
         containerStyle,
       ]}
+      isInteractive
     >
       <Animated.Text style={[{ color: 'white', fontSize: 14, fontWeight: '500' }, textStyle]}>
         {name}
