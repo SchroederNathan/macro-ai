@@ -1,13 +1,16 @@
 import CalorieTracker from "@/components/CalorieTracker"
 import DatePicker from "@/components/DatePicker"
+import { FoodHistory } from "@/components/FoodEntryCard"
 import MacroProgress from "@/components/MacroProgress"
 import { useDailyLogStore, useUserStore } from "@/stores"
 import { useCallback, useEffect } from "react"
-import { View } from "react-native"
+import { ScrollView, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useHeaderHeight } from "@react-navigation/elements"
 
 export default function HomeScreen() {
     const headerHeight = useHeaderHeight()
+    const insets = useSafeAreaInsets()
 
     // Subscribe to specific values from stores (this ensures re-renders)
     const calories = useDailyLogStore(state => state.log.totals.calories)
@@ -20,6 +23,7 @@ export default function HomeScreen() {
     const proteinGoal = useUserStore(state => state.goals.protein)
     const carbsGoal = useUserStore(state => state.goals.carbs)
     const fatGoal = useUserStore(state => state.goals.fat)
+    const entries = useDailyLogStore(state => state.log.entries)
     const loadUserGoals = useUserStore(state => state.load)
 
     // Load stores on mount
@@ -38,7 +42,11 @@ export default function HomeScreen() {
     }, [loadDailyLog])
 
     return (
-        <View className="flex-1 pt-safe" style={{ paddingTop: headerHeight }}>
+        <ScrollView
+            className="flex-1"
+            contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: insets.bottom + 20 }}
+            showsVerticalScrollIndicator={false}
+        >
             <DatePicker
                 selectedDate={currentDate}
                 calorieGoal={targetCalories}
@@ -56,6 +64,9 @@ export default function HomeScreen() {
                 fat={fat}
                 fatGoal={fatGoal}
             />
-        </View>
+            <View className="px-4 mt-6 pb-4">
+                <FoodHistory entries={entries} />
+            </View>
+        </ScrollView>
     )
 }
