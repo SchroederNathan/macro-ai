@@ -8,7 +8,7 @@ import { BlurView } from 'expo-blur'
 import { GlassView } from 'expo-glass-effect'
 import { MeshGradientView } from 'expo-mesh-gradient'
 import { Stack } from 'expo-router'
-import { createContext, useCallback, useContext, useEffect, useRef } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import { ColorSchemeName, Dimensions, StyleSheet, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import PagerView, { PagerViewOnPageScrollEventData } from 'react-native-pager-view'
@@ -19,6 +19,11 @@ const SCREEN_WIDTH = Dimensions.get('window').width
 
 // Context to share scroll position with child screens
 export const ScrollPositionContext = createContext<SharedValue<number> | null>(null)
+
+// Context to allow child screens to navigate the pager
+export const PagerNavigationContext = createContext<{
+  navigateToPage: (page: number) => void
+} | null>(null)
 
 // Page indicator constants
 const PAGE_NAMES = ['Dashboard', 'Chat', 'History']
@@ -181,9 +186,8 @@ function AnimatedChatGradient({ scrollPosition }: { scrollPosition: SharedValue<
 
 const AppStack = createNativeStackNavigator()
 
-function PagerContent({ scrollPosition }: { scrollPosition: SharedValue<number> }) {
+function PagerContent({ scrollPosition, pagerRef }: { scrollPosition: SharedValue<number>, pagerRef: React.RefObject<PagerView | null> }) {
   const navigation = useNavigation()
-  const pagerRef = useRef<PagerView>(null)
   const colorScheme = useColorScheme()
   const lastHapticPosition = useRef<number | null>(null)
 
@@ -255,46 +259,55 @@ function PagerContent({ scrollPosition }: { scrollPosition: SharedValue<number> 
 export default function PagerScreen() {
   const scrollPosition = useSharedValue(1) // Start at initial page (Chat)
   const colorScheme = useColorScheme()
+  const pagerRef = useRef<PagerView>(null)
+
+  const pagerNavigation = useMemo(() => ({
+    navigateToPage: (page: number) => {
+      pagerRef.current?.setPage(page)
+    },
+  }), [])
 
   return (
     <ScrollPositionContext.Provider value={scrollPosition}>
-      <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? colors.dark.background : colors.light.background }}>
-        <AnimatedMeshBackground scrollPosition={scrollPosition} />
-        <NavigationIndependentTree>
-          <NavigationContainer>
-            <AppStack.Navigator id="app">
-              <AppStack.Screen
-                name="Main"
-                options={{
-                  headerTransparent: true,
-                  headerLargeStyle: { backgroundColor: 'transparent' },
-                  headerShadowVisible: false,        // iOS: hide bottom shadow
-                  headerBlurEffect: undefined,
-                  headerTitle: () => <AnimatedHeaderTitle />,
+      <PagerNavigationContext.Provider value={pagerNavigation}>
+        <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? colors.dark.background : colors.light.background }}>
+          <AnimatedMeshBackground scrollPosition={scrollPosition} />
+          <NavigationIndependentTree>
+            <NavigationContainer>
+              <AppStack.Navigator id="app">
+                <AppStack.Screen
+                  name="Main"
+                  options={{
+                    headerTransparent: true,
+                    headerLargeStyle: { backgroundColor: 'transparent' },
+                    headerShadowVisible: false,        // iOS: hide bottom shadow
+                    headerBlurEffect: undefined,
+                    headerTitle: () => <AnimatedHeaderTitle />,
 
-                  contentStyle: { backgroundColor: 'transparent' },
-                }}
-              >
-                {() => {
-                  return (
-                    <>
-                      <Stack.Toolbar placement="right" >
-                        <Stack.Toolbar.Menu>
-                          <Stack.Toolbar.Icon sf="sparkles" />
-                          <Stack.Toolbar.Label>Test menui</Stack.Toolbar.Label>
-                          <Stack.Toolbar.MenuAction onPress={() => { }}>Action 1</Stack.Toolbar.MenuAction>
-                        </Stack.Toolbar.Menu>
-                      </Stack.Toolbar>
-                      <PagerContent scrollPosition={scrollPosition} />
-                    </>
-                  )
-                }}
-              </AppStack.Screen>
-            </AppStack.Navigator>
-          </NavigationContainer>
-        </NavigationIndependentTree>
-        <AnimatedChatGradient scrollPosition={scrollPosition} />
-      </View>
+                    contentStyle: { backgroundColor: 'transparent' },
+                  }}
+                >
+                  {() => {
+                    return (
+                      <>
+                        <Stack.Toolbar placement="right" >
+                          <Stack.Toolbar.Menu>
+                            <Stack.Toolbar.Icon sf="sparkles" />
+                            <Stack.Toolbar.Label>Test menui</Stack.Toolbar.Label>
+                            <Stack.Toolbar.MenuAction onPress={() => { }}>Action 1</Stack.Toolbar.MenuAction>
+                          </Stack.Toolbar.Menu>
+                        </Stack.Toolbar>
+                        <PagerContent scrollPosition={scrollPosition} pagerRef={pagerRef} />
+                      </>
+                    )
+                  }}
+                </AppStack.Screen>
+              </AppStack.Navigator>
+            </NavigationContainer>
+          </NavigationIndependentTree>
+          <AnimatedChatGradient scrollPosition={scrollPosition} />
+        </View>
+      </PagerNavigationContext.Provider>
     </ScrollPositionContext.Provider >
   )
 }

@@ -2,13 +2,14 @@ import { AnimatedInput, type AnimatedInputRef, EmptyStateCarousels, FoodConfirma
 import { colors } from '@/constants/colors'
 import { generateAPIUrl } from '@/utils'
 import { useDailyLogStore, useUserStore } from '@/stores'
+import { PagerNavigationContext } from '@/app/(app)/index'
 import { useChat } from '@ai-sdk/react'
 import { useHeaderHeight } from '@react-navigation/elements'
 import { FlashList, type FlashListRef } from '@shopify/flash-list'
 import type { UIMessage } from 'ai'
 import { DefaultChatTransport } from 'ai'
 import { fetch as expoFetch } from 'expo/fetch'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Haptics } from 'react-native-nitro-haptics'
 import { Keyboard, Pressable, useColorScheme, View } from 'react-native'
 import { Text } from '@/components/ui/Text'
@@ -91,6 +92,9 @@ export default function ChatScreen() {
   const isDark = colorScheme === 'dark'
   // Keyboard animation for content padding
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation()
+
+  // Pager navigation for swipe-to-dashboard after logging
+  const pagerNavigation = useContext(PagerNavigationContext)
 
   // Zustand stores - destructure functions for stable references
   const { load: loadDailyLog, addEntry } = useDailyLogStore()
@@ -315,7 +319,14 @@ export default function ChatScreen() {
     setShowCard(false)
     setMealTitle(null)
     setIsTitleLoading(false)
-  }, [pendingEntries, addEntry])
+
+    // Dismiss keyboard and swipe to Dashboard
+    Keyboard.dismiss()
+    // Small delay so the card dismissal starts before the page swipe
+    setTimeout(() => {
+      pagerNavigation?.navigateToPage(0)
+    }, 150)
+  }, [pendingEntries, addEntry, pagerNavigation])
 
   // Handle removing a specific entry from the pending list
   const handleRemoveEntry = useCallback((index: number) => {
