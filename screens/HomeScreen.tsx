@@ -2,6 +2,7 @@ import CalorieTracker from "@/components/CalorieTracker"
 import DatePicker from "@/components/DatePicker"
 import { FoodHistory } from "@/components/FoodEntryCard"
 import MacroProgress from "@/components/MacroProgress"
+import WeeklyCalorieChart from "@/components/WeeklyCalorieChart"
 import { useDailyLogStore, useUserStore } from "@/stores"
 import { useCallback, useEffect } from "react"
 import { ScrollView, View } from "react-native"
@@ -66,6 +67,7 @@ export default function HomeScreen() {
             />
             <View className="px-4 mt-6 pb-4">
                 <FoodHistory entries={entries} />
+                {/* <WeeklyCalorieChart calorieGoal={targetCalories} /> */}
             </View>
         </ScrollView>
     )
