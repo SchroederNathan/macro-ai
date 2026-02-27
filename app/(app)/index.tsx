@@ -2,17 +2,16 @@ import { colors } from '@/constants/colors'
 import ChatScreen from '@/screens/ChatScreen'
 import HistoryScreen from '@/screens/HistoryScreen'
 import HomeScreen from '@/screens/HomeScreen'
-import { NavigationContainer, NavigationIndependentTree, useNavigation } from '@react-navigation/native'
+import { NavigationContainer, NavigationIndependentTree } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { BlurView } from 'expo-blur'
 import { GlassView } from 'expo-glass-effect'
 import { MeshGradientView } from 'expo-mesh-gradient'
 import { Stack } from 'expo-router'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
-import { ColorSchemeName, Dimensions, StyleSheet, useColorScheme, View } from 'react-native'
+import { createContext, useCallback, useContext, useMemo, useRef } from 'react'
+import { Dimensions, StyleSheet, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
-import PagerView, { PagerViewOnPageScrollEventData } from 'react-native-pager-view'
-import Animated, { interpolate, SharedValue, useAnimatedProps, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import PagerView from 'react-native-pager-view'
+import Animated, { Extrapolation, interpolate, runOnJS, SharedValue, useAnimatedStyle, useDerivedValue, useEvent, useHandler, useSharedValue } from 'react-native-reanimated'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -38,34 +37,84 @@ const PILL_WIDTHS: Record<string, number> = {
 }
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView)
+const AnimatedPagerView = Animated.createAnimatedComponent(PagerView)
 
-const MAX_BLUR = 10
+// Worklet-based scroll handler for PagerView (runs on UI thread like useAnimatedScrollHandler)
+type PageScrollEventData = { position: number; offset: number }
 
-type BlurredPageProps = {
+function useAnimatedPagerScrollHandler(
+  handlers: { onPageScroll?: (e: PageScrollEventData, ctx: Record<string, unknown>) => void },
+  dependencies?: unknown[],
+) {
+  const { context, doDependenciesDiffer } = useHandler(handlers, dependencies)
+  return useEvent<PageScrollEventData>(
+    (event) => {
+      'worklet'
+      if (handlers.onPageScroll) {
+        handlers.onPageScroll(event, context)
+      }
+    },
+    ['onPageScroll'],
+    doDependenciesDiffer,
+  )
+}
+
+const CUBE_ANGLE = 70
+
+type CubePageProps = {
   pageIndex: number
   scrollPosition: SharedValue<number>
   children: React.ReactNode
-  colorScheme: ColorSchemeName
 }
 
-function BlurredPage({ pageIndex, scrollPosition, children, colorScheme }: BlurredPageProps) {
-  const animatedProps = useAnimatedProps(() => {
-    const distance = Math.abs(scrollPosition.value - pageIndex)
-    const intensity = Math.min(distance * MAX_BLUR, MAX_BLUR)
-    return { intensity }
+function CubePage({ pageIndex, scrollPosition, children }: CubePageProps) {
+  const currentIndex = useDerivedValue(() => {
+    return Math.floor(scrollPosition.value)
+  })
+
+  const cubeStyle = useAnimatedStyle(() => {
+    const progress = scrollPosition.value - currentIndex.value
+
+    const scaleY = interpolate(
+      scrollPosition.value,
+      [pageIndex - 1, pageIndex, pageIndex + 1],
+      [0.95, 1, 0.95],
+      Extrapolation.CLAMP,
+    )
+
+    // Active card: rotates away on right edge
+    if (pageIndex === currentIndex.value) {
+      const rotateY = interpolate(progress, [0, 1], [0, -CUBE_ANGLE], Extrapolation.CLAMP)
+      return {
+        transformOrigin: 'right',
+        transform: [
+          { perspective: SCREEN_WIDTH * 4 },
+          { scaleY },
+          { rotateY: `${rotateY}deg` },
+        ],
+      }
+    }
+
+    // Next card: rotates in from left edge
+    if (pageIndex === currentIndex.value + 1) {
+      const rotateY = interpolate(progress, [0, 1], [CUBE_ANGLE, 0], Extrapolation.CLAMP)
+      return {
+        transformOrigin: 'left',
+        transform: [
+          { perspective: SCREEN_WIDTH * 4 },
+          { scaleY },
+          { rotateY: `${rotateY}deg` },
+        ],
+      }
+    }
+
+    return {}
   })
 
   return (
-    <View style={styles.pageContainer}>
+    <Animated.View style={[styles.pageContainer, cubeStyle]}>
       {children}
-      <AnimatedBlurView
-        animatedProps={animatedProps}
-        style={StyleSheet.absoluteFill}
-        tint={colorScheme === 'dark' ? 'dark' : 'light'}
-        pointerEvents="none"
-      />
-    </View>
+    </Animated.View>
   )
 }
 
@@ -143,13 +192,13 @@ function AnimatedMeshBackground({ scrollPosition }: { scrollPosition: SharedValu
         columns={3}
         rows={3}
         colors={[
-          '#3b82f6', '#2563eb', '#1e3a8a10',
-          '#1e40af70', '#1e3a8a30', '#1e3a8a10',
+          '#3b82f6', '#2563eb', '#1e3a8a30',
+          '#1e40af70', '#1e3a8a30', 'transparent',
           'transparent', 'transparent', 'transparent',
         ]}
         points={[
-          [0.0, 0.0], [0.5, 0.0], [1.0, 0.0],
-          [0.0, 0.5], [0.5, 0.5], [1.0, 0.5],
+          [0.0, 0.0], [0.5, 0.0], [1.0, 0],
+          [0.0, 0.5], [0.5, 0.5], [1, 1],
           [0.0, 1.0], [0.5, 1.0], [1.0, 1.0],
         ]}
       />
@@ -187,71 +236,56 @@ function AnimatedChatGradient({ scrollPosition }: { scrollPosition: SharedValue<
 const AppStack = createNativeStackNavigator()
 
 function PagerContent({ scrollPosition, pagerRef }: { scrollPosition: SharedValue<number>, pagerRef: React.RefObject<PagerView | null> }) {
-  const navigation = useNavigation()
-  const colorScheme = useColorScheme()
-  const lastHapticPosition = useRef<number | null>(null)
+  const lastHapticPosition = useSharedValue<number | null>(null)
 
-  // Update header options when scroll position changes
-  useEffect(() => {
-    const updateHeader = () => {
-      const currentPage = Math.round(scrollPosition.value)
-      navigation.setOptions({
-        headerRight: currentPage === 1 ? () => null : undefined,
-      })
-    }
+  const triggerHaptic = useCallback(() => {
+    Haptics.impact('soft')
+  }, [])
 
-    // Initial update
-    updateHeader()
-  }, [navigation, scrollPosition])
+  // Runs entirely on UI thread — no JS bridge lag
+  const scrollHandler = useAnimatedPagerScrollHandler({
+    onPageScroll: (e) => {
+      'worklet'
+      const effectivePosition = e.position + e.offset
+      scrollPosition.value = effectivePosition
 
-  const handlePageScroll = useCallback((e: { nativeEvent: PagerViewOnPageScrollEventData }) => {
-    const { position, offset } = e.nativeEvent
+      const roundedHalf = Math.round(effectivePosition * 2) / 2
 
-    // Calculate effective position (position + offset gives us a continuous value)
-    const effectivePosition = position + offset
+      if (roundedHalf % 1 === 0.5 && lastHapticPosition.value !== roundedHalf) {
+        lastHapticPosition.value = roundedHalf
+        runOnJS(triggerHaptic)()
+      }
 
-    // Update shared value for blur animation
-    scrollPosition.value = effectivePosition
-
-    // Round to nearest 0.5 to detect crossing the halfway point
-    const roundedHalf = Math.round(effectivePosition * 2) / 2
-
-    // Only trigger haptic when crossing a .5 boundary (halfway between pages)
-    if (roundedHalf % 1 === 0.5 && lastHapticPosition.current !== roundedHalf) {
-      lastHapticPosition.current = roundedHalf
-      Haptics.impact('soft')
-    }
-
-    // Reset when we land on a page
-    if (offset === 0) {
-      lastHapticPosition.current = null
-    }
-  }, [scrollPosition])
+      if (e.offset === 0) {
+        lastHapticPosition.value = null
+      }
+    },
+  })
 
   return (
     <>
-      <PagerView
+      <AnimatedPagerView
         ref={pagerRef}
         style={{ flex: 1 }}
         initialPage={1}
-        onPageScroll={handlePageScroll}
+        onPageScroll={scrollHandler}
       >
         <View key="home" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={0} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <CubePage pageIndex={0} scrollPosition={scrollPosition}>
             <HomeScreen />
-          </BlurredPage>
+          </CubePage>
         </View>
         <View key="chat" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={1} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <CubePage pageIndex={1} scrollPosition={scrollPosition}>
             <ChatScreen />
-          </BlurredPage>
+          </CubePage>
         </View>
         <View key="history" style={{ flex: 1 }}>
-          <BlurredPage pageIndex={2} scrollPosition={scrollPosition} colorScheme={colorScheme}>
+          <CubePage pageIndex={2} scrollPosition={scrollPosition}>
             <HistoryScreen />
-          </BlurredPage>
+          </CubePage>
         </View>
-      </PagerView>
+      </AnimatedPagerView>
     </>
   )
 }
