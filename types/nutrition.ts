@@ -40,6 +40,17 @@ export type FoodLogEntry = {
   meal?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
 };
 
+/** Pending food entry awaiting user confirmation in chat */
+export type FoodConfirmationEntry = {
+  name: string;
+  quantity: number;
+  serving: { amount: number; unit: string; gramWeight: number };
+  nutrients: { calories: number; protein: number; carbs: number; fat: number; fiber?: number };
+  meal?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  fdcId?: number;
+  estimated?: boolean;
+};
+
 /** Daily log stored at log:{yyyy-mm-dd} */
 export type DailyLog = {
   date: string;
@@ -201,9 +212,12 @@ export function generateEntryId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Format date as yyyy-mm-dd */
+/** Format date as yyyy-mm-dd in local timezone */
 export function formatDateKey(date: Date = new Date()): string {
-  return date.toISOString().split('T')[0];
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /** Extract macros from USDA nutrients array */

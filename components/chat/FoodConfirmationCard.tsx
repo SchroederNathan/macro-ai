@@ -1,6 +1,7 @@
 import { AnimatedValue } from '@/components/ui/AnimatedValue'
 import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
+import { useRouter } from 'expo-router'
 import { GlassView } from 'expo-glass-effect'
 import { Minus, Plus, X } from 'lucide-react-native'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
@@ -12,10 +13,13 @@ import Animated, {
   FadeOut,
   FadeOutDown,
   LinearTransition,
+  SharedTransition,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated'
+
+const SHARED_TRANSITION = SharedTransition.duration(550).springify()
 import { ShimmerText } from './ShimmerText'
 
 const entryLayoutTransition = LinearTransition.springify()
@@ -26,15 +30,9 @@ const MACRO_COLORS = {
   protein: '#22C55E', // Green
 }
 
-export type FoodConfirmationEntry = {
-  name: string
-  quantity: number
-  serving: { amount: number; unit: string; gramWeight: number }
-  nutrients: { calories: number; protein: number; carbs: number; fat: number; fiber?: number }
-  meal?: 'breakfast' | 'lunch' | 'dinner' | 'snack'
-  fdcId?: number
-  estimated?: boolean
-}
+// Re-export from canonical location
+export type { FoodConfirmationEntry } from '@/types/nutrition'
+import type { FoodConfirmationEntry } from '@/types/nutrition'
 
 type FoodConfirmationCardProps = {
   entries: FoodConfirmationEntry[]
@@ -92,19 +90,8 @@ function MacroSegment({ percent, color, position }: MacroSegmentProps) {
 
   return (
     <Animated.View
-      style={animatedStyle}
-    >
-      <GlassView
-        tintColor={color}
-        isInteractive={true}
-        style={
-
-          {
-            height: 24,
-            ...borderRadius,
-          }}
-      />
-    </Animated.View >)
+      style={[animatedStyle, { backgroundColor: color, height: 24, ...borderRadius }]}
+    />)
 }
 
 // Segmented macro bar component
@@ -248,9 +235,16 @@ export function FoodConfirmationCard({
   const isDark = colorScheme === 'dark'
   const theme = isDark ? colors.dark : colors.light
   const [isEditMode, setIsEditMode] = useState(false)
+  const router = useRouter()
 
   const isEmpty = entries.length === 0
   const meal = entries[0]?.meal || getDefaultMeal()
+
+  const handleNavigateToDetail = useCallback(() => {
+    if (isEmpty) return
+    Haptics.selection()
+    router.push({ pathname: '/(app)/food-detail', params: { mode: 'pending', entries: JSON.stringify(entries) } })
+  }, [isEmpty, router, entries])
 
   // Calculate totals
   const { totalCalories, totalProtein, totalCarbs, totalFat } = useMemo(() => {
@@ -305,6 +299,7 @@ export function FoodConfirmationCard({
 
   return (
     <View className="mx-1 -mb-2">
+      <Animated.View sharedTransitionTag="food-confirm-card" sharedTransitionStyle={SHARED_TRANSITION}>
       <GlassView
         isInteractive
         style={{
@@ -318,6 +313,7 @@ export function FoodConfirmationCard({
         }}
       >
         {/* Header: Title + Edit */}
+        <Pressable onPress={handleNavigateToDetail}>
         <Animated.View layout={entryLayoutTransition} className="flex-row justify-between items-center mb-8">
           {isEmpty ? (
             <Text className="text-muted text-lg">Add food to continue...</Text>
@@ -338,14 +334,11 @@ export function FoodConfirmationCard({
               )}
             </View>
           )}
-          {/* {!isEmpty && (
-            <Pressable onPress={toggleEditMode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text className="text-primary text-base font-medium">
-                {isEditMode ? 'Done' : 'Edit'}
-              </Text>
-            </Pressable>
-          )} */}
+          {!isEmpty && (
+            <Text className="text-primary text-sm font-medium">Details</Text>
+          )}
         </Animated.View>
+        </Pressable>
 
         {/* Large Calories */}
         {!isEmpty && (
@@ -425,6 +418,7 @@ export function FoodConfirmationCard({
           </GlassView>
         </Animated.View>
       </GlassView>
+      </Animated.View>
     </View>
   )
 }

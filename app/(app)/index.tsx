@@ -1,26 +1,17 @@
 import { colors } from '@/constants/colors'
+import { PagerNavigationContext, ScrollPositionContext } from '@/contexts/PagerContexts'
 import ChatScreen from '@/screens/ChatScreen'
 import HistoryScreen from '@/screens/HistoryScreen'
 import HomeScreen from '@/screens/HomeScreen'
-import { NavigationContainer, NavigationIndependentTree } from '@react-navigation/native'
-import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { GlassView } from 'expo-glass-effect'
 import { MeshGradientView } from 'expo-mesh-gradient'
-import { Stack } from 'expo-router'
-import { createContext, useCallback, useContext, useMemo, useRef } from 'react'
-import { StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native'
+import { useCallback, useContext, useMemo, useRef } from 'react'
+import { StyleSheet, useColorScheme, useWindowDimensions, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import PagerView from 'react-native-pager-view'
 import Animated, { Extrapolation, interpolate, runOnJS, SharedValue, useAnimatedStyle, useDerivedValue, useEvent, useHandler, useSharedValue } from 'react-native-reanimated'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
-
-// Context to share scroll position with child screens
-export const ScrollPositionContext = createContext<SharedValue<number> | null>(null)
-
-// Context to allow child screens to navigate the pager
-export const PagerNavigationContext = createContext<{
-  navigateToPage: (page: number) => void
-} | null>(null)
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 // Page indicator constants
 const PAGE_NAMES = ['Dashboard', 'Chat', 'History']
@@ -165,10 +156,7 @@ function PageIndicator({ name, pageIndex, scrollPosition }: PageIndicatorProps) 
   )
 }
 
-function AnimatedHeaderTitle() {
-  const scrollPosition = useContext(ScrollPositionContext)
-  if (!scrollPosition) return null
-
+function AnimatedHeaderTitle({ scrollPosition }: { scrollPosition: SharedValue<number> }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
       {PAGE_NAMES.map((name, index) => (
@@ -233,8 +221,6 @@ function AnimatedChatGradient({ scrollPosition }: { scrollPosition: SharedValue<
   )
 }
 
-const AppStack = createNativeStackNavigator()
-
 function PagerContent({ scrollPosition, pagerRef }: { scrollPosition: SharedValue<number>, pagerRef: React.RefObject<PagerView | null> }) {
   const lastHapticPosition = useSharedValue<number | null>(null)
 
@@ -263,37 +249,39 @@ function PagerContent({ scrollPosition, pagerRef }: { scrollPosition: SharedValu
   })
 
   return (
-    <>
-      <AnimatedPagerView
-        ref={pagerRef}
-        style={{ flex: 1 }}
-        initialPage={1}
-        onPageScroll={scrollHandler}
-      >
-        <View key="home" style={{ flex: 1 }}>
-          <CubePage pageIndex={0} scrollPosition={scrollPosition}>
-            <HomeScreen />
-          </CubePage>
-        </View>
-        <View key="chat" style={{ flex: 1 }}>
-          <CubePage pageIndex={1} scrollPosition={scrollPosition}>
-            <ChatScreen />
-          </CubePage>
-        </View>
-        <View key="history" style={{ flex: 1 }}>
-          <CubePage pageIndex={2} scrollPosition={scrollPosition}>
-            <HistoryScreen />
-          </CubePage>
-        </View>
-      </AnimatedPagerView>
-    </>
+    <AnimatedPagerView
+      ref={pagerRef}
+      style={{ flex: 1 }}
+      initialPage={1}
+      onPageScroll={scrollHandler}
+    >
+      <View key="home" style={{ flex: 1 }}>
+        <CubePage pageIndex={0} scrollPosition={scrollPosition}>
+          <HomeScreen />
+        </CubePage>
+      </View>
+      <View key="chat" style={{ flex: 1 }}>
+        <CubePage pageIndex={1} scrollPosition={scrollPosition}>
+          <ChatScreen />
+        </CubePage>
+      </View>
+      <View key="history" style={{ flex: 1 }}>
+        <CubePage pageIndex={2} scrollPosition={scrollPosition}>
+          <HistoryScreen />
+        </CubePage>
+      </View>
+    </AnimatedPagerView>
   )
 }
 
+// Header height constant (safe area top + header content)
+const HEADER_HEIGHT = 44
+
 export default function PagerScreen() {
-  const scrollPosition = useSharedValue(1) // Start at initial page (Chat)
+  const scrollPosition = useContext(ScrollPositionContext)!
   const colorScheme = useColorScheme()
   const pagerRef = useRef<PagerView>(null)
+  const insets = useSafeAreaInsets()
 
   const pagerNavigation = useMemo(() => ({
     navigateToPage: (page: number) => {
@@ -302,47 +290,32 @@ export default function PagerScreen() {
   }), [])
 
   return (
-    <ScrollPositionContext.Provider value={scrollPosition}>
-      <PagerNavigationContext.Provider value={pagerNavigation}>
-        <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? colors.dark.background : colors.light.background }}>
-          <AnimatedMeshBackground scrollPosition={scrollPosition} />
-          <NavigationIndependentTree>
-            <NavigationContainer>
-              <AppStack.Navigator id="app">
-                <AppStack.Screen
-                  name="Main"
-                  options={{
-                    headerTransparent: true,
-                    headerLargeStyle: { backgroundColor: 'transparent' },
-                    headerShadowVisible: false,        // iOS: hide bottom shadow
-                    headerBlurEffect: undefined,
-                    headerTitle: () => <AnimatedHeaderTitle />,
+    <PagerNavigationContext.Provider value={pagerNavigation}>
+      <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? colors.dark.background : colors.light.background }}>
+        <AnimatedMeshBackground scrollPosition={scrollPosition} />
 
-                    contentStyle: { backgroundColor: 'transparent' },
-                  }}
-                >
-                  {() => {
-                    return (
-                      <>
-                        <Stack.Toolbar placement="right" >
-                          <Stack.Toolbar.Menu>
-                            <Stack.Toolbar.Icon sf="sparkles" />
-                            <Stack.Toolbar.Label><Text>Test menui</Text></Stack.Toolbar.Label>
-                            <Stack.Toolbar.MenuAction onPress={() => { }}><Text>Action 1</Text></Stack.Toolbar.MenuAction>
-                          </Stack.Toolbar.Menu>
-                        </Stack.Toolbar>
-                        <PagerContent scrollPosition={scrollPosition} pagerRef={pagerRef} />
-                      </>
-                    )
-                  }}
-                </AppStack.Screen>
-              </AppStack.Navigator>
-            </NavigationContainer>
-          </NavigationIndependentTree>
-          <AnimatedChatGradient scrollPosition={scrollPosition} />
+        {/* Custom header with animated page indicators */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+            paddingTop: insets.top,
+            height: insets.top + HEADER_HEIGHT,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          pointerEvents="none"
+        >
+          <AnimatedHeaderTitle scrollPosition={scrollPosition} />
         </View>
-      </PagerNavigationContext.Provider>
-    </ScrollPositionContext.Provider >
+
+        <PagerContent scrollPosition={scrollPosition} pagerRef={pagerRef} />
+        <AnimatedChatGradient scrollPosition={scrollPosition} />
+      </View>
+    </PagerNavigationContext.Provider>
   )
 }
 

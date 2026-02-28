@@ -1,4 +1,4 @@
-import { ScrollPositionContext } from '@/app/(app)/index'
+import { ScrollPositionContext } from '@/contexts/PagerContexts'
 import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
 import { getDailyLog } from '@/lib/storage'

@@ -61,6 +61,10 @@ type AnimatedValueProps = {
   value: string | number
   className?: string
   suffix?: string
+  /** Animate the rolling entrance on mount */
+  animateOnMount?: boolean
+  /** Delay in ms before mount animation starts */
+  mountDelay?: number
 }
 
 /**
@@ -71,12 +75,24 @@ export const AnimatedValue: FC<AnimatedValueProps> = ({
   value,
   className = 'text-foreground text-base font-semibold',
   suffix = '',
+  animateOnMount = false,
+  mountDelay = 0,
 }) => {
-  const progress = useSharedValue(1)
+  const progress = useSharedValue(animateOnMount ? 0 : 1)
   const [displayValue, setDisplayValue] = useState(String(value) + suffix)
   const prevValueRef = useRef(value)
   const isFirstRender = useRef(true)
   const isTransitioning = useRef(false)
+
+  // Animate on mount if requested
+  useEffect(() => {
+    if (animateOnMount) {
+      const timer = setTimeout(() => {
+        progress.set(1)
+      }, mountDelay)
+      return () => clearTimeout(timer)
+    }
+  }, [animateOnMount, mountDelay, progress])
 
   useEffect(() => {
     const newDisplayValue = String(value) + suffix

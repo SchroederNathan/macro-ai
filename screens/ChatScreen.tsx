@@ -2,9 +2,8 @@ import { AnimatedInput, type AnimatedInputRef, EmptyStateCarousels, FoodConfirma
 import { colors } from '@/constants/colors'
 import { generateAPIUrl } from '@/utils'
 import { useDailyLogStore, useUserStore } from '@/stores'
-import { PagerNavigationContext } from '@/app/(app)/index'
+import { FoodDetailCallbackRegistryContext, PagerNavigationContext } from '@/contexts/PagerContexts'
 import { useChat } from '@ai-sdk/react'
-import { useHeaderHeight } from '@react-navigation/elements'
 import { FlashList, type FlashListRef } from '@shopify/flash-list'
 import type { UIMessage } from 'ai'
 import { DefaultChatTransport } from 'ai'
@@ -86,8 +85,8 @@ export default function ChatScreen() {
   const processedToolCallsRef = useRef<Set<string>>(new Set())
   const listRef = useRef<FlashListRef<UIMessage>>(null)
   const inputRef = useRef<AnimatedInputRef>(null)
-  const headerHeight = useHeaderHeight()
   const insets = useSafeAreaInsets()
+  const headerHeight = insets.top + 44
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
   // Keyboard animation for content padding
@@ -95,6 +94,9 @@ export default function ChatScreen() {
 
   // Pager navigation for swipe-to-dashboard after logging
   const pagerNavigation = useContext(PagerNavigationContext)
+
+  // Register pending entry callbacks for FoodDetailScreen
+  const callbackRegistry = useContext(FoodDetailCallbackRegistryContext)
 
   // Zustand stores - destructure functions for stable references
   const { load: loadDailyLog, addEntry } = useDailyLogStore()
@@ -345,6 +347,23 @@ export default function ChatScreen() {
     }
   }, [handleRemoveEntry])
 
+  // Register callbacks for FoodDetailScreen to update pending entries
+  useEffect(() => {
+    if (callbackRegistry) {
+      callbackRegistry.setCallbacks({
+        onPendingEntryUpdate: (index, updates) => {
+          handleQuantityChange(index, updates.quantity)
+        },
+        onPendingEntryRemove: (index) => {
+          handleRemoveEntry(index)
+        },
+      })
+    }
+    return () => {
+      callbackRegistry?.setCallbacks(null)
+    }
+  }, [callbackRegistry, handleQuantityChange, handleRemoveEntry])
+
   // Generate meal title when entries change (2+ items)
   useEffect(() => {
     if (pendingEntries.length >= 2) {
@@ -408,7 +427,7 @@ export default function ChatScreen() {
         {messages.length === 0 && (
           <Animated.View
             entering={SlideInUp.springify().delay(100)}
-            style={{ paddingTop: headerHeight || (insets.top + 44) + 8 }}
+            style={{ paddingTop: headerHeight + 8 }}
           >
             <EmptyStateCarousels onSelectItem={handleCarouselSelect} />
           </Animated.View>

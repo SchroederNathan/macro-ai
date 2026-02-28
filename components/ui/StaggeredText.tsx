@@ -60,6 +60,8 @@ type StaggeredTextProps = {
   visible: boolean
   intervalMs?: number
   className?: string
+  /** Delay in ms before the initial animation starts */
+  initialDelay?: number
 }
 
 export const StaggeredText: FC<StaggeredTextProps> = ({
@@ -67,6 +69,7 @@ export const StaggeredText: FC<StaggeredTextProps> = ({
   visible,
   intervalMs = 3000,
   className = 'text-base text-muted',
+  initialDelay = 100,
 }) => {
   const progress = useSharedValue(0)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -78,7 +81,7 @@ export const StaggeredText: FC<StaggeredTextProps> = ({
       // Show initial text
       const showTimeout = setTimeout(() => {
         progress.set(1)
-      }, 100)
+      }, initialDelay)
 
       // Start cycling through phrases
       intervalRef.current = setInterval(() => {

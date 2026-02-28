@@ -10,6 +10,7 @@ import { Text } from './ui/Text'
 type DatePickerProps = {
   selectedDate: string
   calorieGoal: number
+  currentDateCalories: number
   onSelectDate: (date: string) => void
 }
 
@@ -126,6 +127,7 @@ type DateItem = {
 export default function DatePicker({
   selectedDate,
   calorieGoal,
+  currentDateCalories,
   onSelectDate,
 }: DatePickerProps) {
   const handleDatePress = useCallback((dateKey: string) => {
@@ -174,7 +176,7 @@ export default function DatePicker({
 
     return items
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]) // Re-compute when selected date changes to refresh calorie data
+  }, [selectedDate, currentDateCalories]) // Re-compute when selected date or calorie data changes
 
   return (
     <View
