@@ -46,5 +46,4 @@ export const colors = {
   },
 } as const
 
-export type ColorScheme = keyof typeof colors
 export type Colors = typeof colors.light

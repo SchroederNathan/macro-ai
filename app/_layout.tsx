@@ -15,7 +15,7 @@ SplashScreen.preventAutoHideAsync()
 
 function RootLayoutNav() {
   const { session, isLoading } = useAuth()
-  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme())
+  const [colorScheme, setColorScheme] = useState(() => Appearance.getColorScheme())
 
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {

@@ -20,7 +20,7 @@ type DatePickerItemProps = {
   isFuture: boolean
   caloriesConsumed: number
   calorieGoal: number
-  onPress: () => void
+  onPress: (dateKey: string) => void
 }
 
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -32,6 +32,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 const DatePickerItem = memo(function DatePickerItem({
   date,
+  dateKey,
   isSelected,
   isFuture,
   caloriesConsumed,
@@ -50,66 +51,53 @@ const DatePickerItem = memo(function DatePickerItem({
 
   const handlePress = useCallback(() => {
     Haptics.selection()
-    onPress()
-  }, [onPress])
+    onPress(dateKey)
+  }, [onPress, dateKey])
 
-  const renderCircle = () => {
-    if (isFuture) {
-      return null
-    }
-
-    if (!hasLogs) {
-      // Dashed circle for no logs
-      return (
-        <Svg
-          width={CIRCLE_SIZE}
-          height={CIRCLE_SIZE}
-          style={{ position: 'absolute' }}
-        >
-          <Circle
-            cx={CIRCLE_SIZE / 2}
-            cy={CIRCLE_SIZE / 2}
-            r={RADIUS}
-            stroke={theme.foreground}
-            strokeWidth={STROKE_WIDTH}
-            fill="transparent"
-            strokeDasharray="4 4"
-            strokeDashoffset={-5}
-          />
-        </Svg>
-      )
-    }
-
-    // Progress arc for logged days
-    return (
-      <Svg
-        width={CIRCLE_SIZE}
-        height={CIRCLE_SIZE}
-        style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}
-      >
-        {/* Background circle */}
-        <Circle
-          cx={CIRCLE_SIZE / 2}
-          cy={CIRCLE_SIZE / 2}
-          r={RADIUS}
-          // stroke={theme.border}
-          strokeWidth={STROKE_WIDTH}
-          fill="transparent"
-        />
-        {/* Progress arc */}
-        <Circle
-          cx={CIRCLE_SIZE / 2}
-          cy={CIRCLE_SIZE / 2}
-          r={RADIUS}
-          stroke={theme.foreground}
-          strokeWidth={STROKE_WIDTH}
-          fill="transparent"
-          strokeDasharray={`${progressArcLength} ${CIRCUMFERENCE}`}
-          strokeLinecap="round"
-        />
-      </Svg>
-    )
-  }
+  const circleElement = isFuture ? null : !hasLogs ? (
+    <Svg
+      width={CIRCLE_SIZE}
+      height={CIRCLE_SIZE}
+      style={{ position: 'absolute' }}
+    >
+      <Circle
+        cx={CIRCLE_SIZE / 2}
+        cy={CIRCLE_SIZE / 2}
+        r={RADIUS}
+        stroke={theme.foreground}
+        strokeWidth={STROKE_WIDTH}
+        fill="transparent"
+        strokeDasharray="4 4"
+        strokeDashoffset={-5}
+      />
+    </Svg>
+  ) : (
+    <Svg
+      width={CIRCLE_SIZE}
+      height={CIRCLE_SIZE}
+      style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}
+    >
+      {/* Background circle */}
+      <Circle
+        cx={CIRCLE_SIZE / 2}
+        cy={CIRCLE_SIZE / 2}
+        r={RADIUS}
+        strokeWidth={STROKE_WIDTH}
+        fill="transparent"
+      />
+      {/* Progress arc */}
+      <Circle
+        cx={CIRCLE_SIZE / 2}
+        cy={CIRCLE_SIZE / 2}
+        r={RADIUS}
+        stroke={theme.foreground}
+        strokeWidth={STROKE_WIDTH}
+        fill="transparent"
+        strokeDasharray={`${progressArcLength} ${CIRCUMFERENCE}`}
+        strokeLinecap="round"
+      />
+    </Svg>
+  )
 
   return (
     <Pressable onPress={handlePress} style={styles.itemContainer}>
@@ -117,7 +105,7 @@ const DatePickerItem = memo(function DatePickerItem({
         {dayLetter}
       </Text>
       <View className="w-10 h-10 items-center justify-center">
-        {renderCircle()}
+        {circleElement}
         <Text
           className={`${isSelected ? "font-bold" : "font-normal"} text-foreground text-xs font-bold`}
         >
@@ -140,6 +128,10 @@ export default function DatePicker({
   calorieGoal,
   onSelectDate,
 }: DatePickerProps) {
+  const handleDatePress = useCallback((dateKey: string) => {
+    onSelectDate(dateKey)
+  }, [onSelectDate])
+
   const dateItems = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -201,7 +193,7 @@ export default function DatePicker({
           isFuture={item.isFuture}
           caloriesConsumed={item.caloriesConsumed}
           calorieGoal={calorieGoal}
-          onPress={() => onSelectDate(item.dateKey)}
+          onPress={handleDatePress}
         />
       ))}
     </View>

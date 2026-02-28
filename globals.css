@@ -10,43 +10,30 @@
 @layer theme {
     :root {
         @variant dark {
-            --color-background: oklch(0.145 0 0);
-            --color-foreground: oklch(0.985 0 0);
-            --color-card: oklch(0.205 0 0);
-            --color-card-foreground: oklch(0.985 0 0);
-            --color-primary: oklch(0.623 0.214 264.1);
-            --color-primary-foreground: oklch(0.985 0 0);
+            --color-background: #0a0a0a;
+            --color-foreground: #f5f5f5;
+            --color-primary: #3b82f6;
             --color-primary-border: oklch(75% 0.183 55.934);
-            --color-muted: oklch(0.269 0 0);
-            --color-muted-foreground: oklch(0.708 0 0);
-            --color-border: oklch(1 0 0 / 10%);
-            --color-input: oklch(1 0 0 / 15%);
-            --color-chat: oklch(0.205 0 0);
-            --color-chat-foreground: oklch(0.985 0 0);
-            --color-user-bubble: oklch(0.627 0.225 37);
-            --color-user-bubble-foreground: oklch(0.985 0 0);
-            --color-destructive: oklch(0.704 0.191 22.216);
-            --color-destructive-foreground: oklch(0.985 0 0);
+            --color-muted: #a3a3a3;
+            --color-chat: oklch(20.5% 0 0);
+            --color-muted-foreground: oklch(26.9% 0 0);
+            --color-card: oklch(18.5% 0 0);
+            --color-border: oklch(26.9% 0 0);
+            --color-user-bubble: #1e3a8a;
+
         }
 
         @variant light {
-            --color-background: oklch(0.985 0 0);
-            --color-foreground: oklch(0.145 0 0);
-            --color-card: oklch(1 0 0);
-            --color-card-foreground: oklch(0.145 0 0);
-            --color-primary: oklch(0.546 0.215 264.1);
-            --color-primary-foreground: oklch(0.985 0 0);
+            --color-background: #fafafa;
+            --color-foreground: #0a0a0a;
+            --color-primary: #2563eb;
             --color-primary-border: oklch(75% 0.183 55.934);
-            --color-muted: oklch(0.97 0 0);
-            --color-muted-foreground: oklch(0.556 0 0);
-            --color-border: oklch(0.922 0 0);
-            --color-input: oklch(0.922 0 0);
-            --color-chat: oklch(0.961 0 0);
-            --color-chat-foreground: oklch(0.145 0 0);
-            --color-user-bubble: oklch(0.546 0.215 264.1);
-            --color-user-bubble-foreground: oklch(0.985 0 0);
-            --color-destructive: oklch(0.577 0.245 27.325);
-            --color-destructive-foreground: oklch(0.985 0 0);
+            --color-chat: #f0f0f0;
+            --color-muted: #f4f4f5;
+            --color-muted-foreground: #71717a;
+            --color-card: #ffffff;
+            --color-border: #e4e4e7;
+            --color-user-bubble: #2563eb;
         }
     }
 }

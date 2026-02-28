@@ -105,9 +105,9 @@ const SingleCarousel = memo(function SingleCarousel({ items, reverse = false, on
   return (
     <View className="overflow-visible my-1.5">
       <Animated.View className="flex-row" style={animatedStyle}>
-        {tripledItems.map((item, index) => (
+        {tripledItems.map((item, idx) => (
           <CarouselCard
-            key={`${item.id}-${index}`}
+            key={`${item.id}-g${Math.floor(idx / items.length)}`}
             item={item}
             onPress={onSelectItem}
           />
@@ -147,11 +147,11 @@ export function EmptyStateCarousels({ onSelectItem }: EmptyStateCarouselsProps) 
 
   const content = (
     <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
-      {carouselRows.map((row, index) => (
+      {carouselRows.map((row, rowIdx) => (
         <SingleCarousel
-          key={index}
+          key={`row-${row[0]?.id ?? rowIdx}`}
           items={row}
-          reverse={index % 2 === 1} // Alternate directions: left, right, left
+          reverse={rowIdx % 2 === 1} // Alternate directions: left, right, left
           onSelectItem={onSelectItem}
         />
       ))}

@@ -54,16 +54,9 @@ export function removeKey(key: string): void {
 }
 
 /**
- * Check if a key exists
- */
-export function hasKey(key: string): boolean {
-  return storage.contains(key);
-}
-
-/**
  * Get all keys matching a prefix
  */
-export function getKeysWithPrefix(prefix: string): string[] {
+function getKeysWithPrefix(prefix: string): string[] {
   return storage.getAllKeys().filter(key => key.startsWith(prefix));
 }
 
@@ -118,23 +111,6 @@ export function saveChatMessages(messages: UIMessage[]): void {
  */
 export function clearChatMessages(): void {
   removeKey(STORAGE_KEYS.chatMessages);
-}
-
-/**
- * Get all daily log dates (sorted descending)
- */
-export function getAllLogDates(): string[] {
-  return getKeysWithPrefix('log:')
-    .map(key => key.replace('log:', ''))
-    .sort((a, b) => b.localeCompare(a));
-}
-
-/**
- * Get calories consumed for a specific date
- */
-export function getCaloriesForDate(date: string): number {
-  const log = getDailyLog(date);
-  return log?.totals.calories ?? 0;
 }
 
 /**

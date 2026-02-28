@@ -55,7 +55,7 @@ const AnimatedChar: FC<AnimatedCharProps> = ({ index, char, progress, totalCount
   )
 }
 
-export type StaggeredTextProps = {
+type StaggeredTextProps = {
   phrases: string[]
   visible: boolean
   intervalMs?: number
@@ -123,11 +123,11 @@ export const StaggeredText: FC<StaggeredTextProps> = ({
 
   return (
     <Animated.View className="flex-row flex-wrap">
-      {currentPhrase.split('').map((char, index) => (
+      {currentPhrase.split('').map((char, charIdx) => (
         <AnimatedChar
-          key={`${currentIndex}-${index}`}
+          key={`${currentPhrase}-${charIdx}`}
           char={char}
-          index={index}
+          index={charIdx}
           totalCount={currentPhrase.length}
           progress={progress}
           className={className}

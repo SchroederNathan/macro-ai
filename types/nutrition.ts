@@ -125,12 +125,6 @@ export type USDAFoodFull = {
 // Zod Schemas for AI Tool Validation
 // ============================================
 
-/** Schema for search_usda_food tool params */
-export const SearchUSDAFoodSchema = z.object({
-  query: z.string().describe('Food search query (e.g., "chicken breast", "banana")'),
-  brand: z.string().optional().describe('Optional brand name to filter results'),
-});
-
 /** Schema for get_usda_food_full tool params */
 export const GetUSDAFoodFullSchema = z.object({
   fdcId: z.number().describe('FDC ID from search results'),

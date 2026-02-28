@@ -24,7 +24,6 @@ const MACRO_COLORS = {
   carbs: '#FBBF24',   // Yellow/amber
   fat: '#3B82F6',     // Blue
   protein: '#22C55E', // Green
-  fiber: '#A855F7',   // Purple
 }
 
 export type FoodConfirmationEntry = {
@@ -93,9 +92,7 @@ function MacroSegment({ percent, color, position }: MacroSegmentProps) {
 
   return (
     <Animated.View
-      style={[
-        animatedStyle,
-      ]}
+      style={animatedStyle}
     >
       <GlassView
         tintColor={color}
@@ -115,31 +112,23 @@ type SegmentedMacroBarProps = {
   carbs: number
   fat: number
   protein: number
-  fiber: number
 }
 
-function SegmentedMacroBar({ carbs, fat, protein, fiber }: SegmentedMacroBarProps) {
-  // Calculate by caloric contribution (protein 4cal/g, carbs 4cal/g, fat 9cal/g)
+function SegmentedMacroBar({ carbs, fat, protein }: SegmentedMacroBarProps) {
   const carbsCals = carbs * 4
   const fatCals = fat * 9
   const proteinCals = protein * 4
   const totalMacroCals = carbsCals + fatCals + proteinCals
 
-  // Each as percentage of total caloric contribution
   const carbsPercent = totalMacroCals > 0 ? (carbsCals / totalMacroCals) * 100 : 33
   const fatPercent = totalMacroCals > 0 ? (fatCals / totalMacroCals) * 100 : 33
   const proteinPercent = totalMacroCals > 0 ? (proteinCals / totalMacroCals) * 100 : 33
 
-  // Fiber gets fixed 8% since 0 calories, normalize others to remaining 92%
-  const fiberPercent = 8
-  const normFactor = 0.92
-
   return (
     <View style={{ flexDirection: 'row', height: 24, gap: 3 }}>
-      <MacroSegment percent={carbsPercent * normFactor} color={MACRO_COLORS.carbs} position="first" />
-      <MacroSegment percent={fatPercent * normFactor} color={MACRO_COLORS.fat} position="middle" />
-      <MacroSegment percent={proteinPercent * normFactor} color={MACRO_COLORS.protein} position="middle" />
-      <MacroSegment percent={fiberPercent} color={MACRO_COLORS.fiber} position="last" />
+      <MacroSegment percent={carbsPercent} color={MACRO_COLORS.carbs} position="first" />
+      <MacroSegment percent={fatPercent} color={MACRO_COLORS.fat} position="middle" />
+      <MacroSegment percent={proteinPercent} color={MACRO_COLORS.protein} position="last" />
     </View>
   )
 }
@@ -264,23 +253,21 @@ export function FoodConfirmationCard({
   const meal = entries[0]?.meal || getDefaultMeal()
 
   // Calculate totals
-  const { totalCalories, totalProtein, totalCarbs, totalFat, totalFiber } = useMemo(() => {
+  const { totalCalories, totalProtein, totalCarbs, totalFat } = useMemo(() => {
     const totals = entries.reduce(
       (acc, entry) => ({
         calories: acc.calories + entry.nutrients.calories * entry.quantity,
         protein: acc.protein + entry.nutrients.protein * entry.quantity,
         carbs: acc.carbs + entry.nutrients.carbs * entry.quantity,
         fat: acc.fat + entry.nutrients.fat * entry.quantity,
-        fiber: acc.fiber + (entry.nutrients.fiber || 0) * entry.quantity,
       }),
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
     )
     return {
       totalCalories: Math.round(totals.calories),
       totalProtein: Math.round(totals.protein),
       totalCarbs: Math.round(totals.carbs),
       totalFat: Math.round(totals.fat),
-      totalFiber: Math.round(totals.fiber),
     }
   }, [entries])
 
@@ -341,7 +328,7 @@ export function FoodConfirmationCard({
                   className="text-foreground text-lg font-semibold"
                   highlightColor={theme.muted}
                 >
-                  Generating title...
+                  <Text>Generating title...</Text>
                 </ShimmerText>
               ) : (
                 <AnimatedValue
@@ -362,7 +349,7 @@ export function FoodConfirmationCard({
 
         {/* Large Calories */}
         {!isEmpty && (
-          <Animated.View layout={entryLayoutTransition} className=" mb-8 flex-row items-end gap-2">
+          <Animated.View layout={entryLayoutTransition} className="mb-8 flex-row items-end gap-2">
             <AnimatedValue
               value={totalCalories}
               className="text-foreground text-5xl font-bold"
@@ -378,7 +365,6 @@ export function FoodConfirmationCard({
               carbs={totalCarbs}
               fat={totalFat}
               protein={totalProtein}
-              fiber={totalFiber}
             />
           </Animated.View>
         )}
@@ -389,7 +375,6 @@ export function FoodConfirmationCard({
             <MacroDetail label="Carbs" value={totalCarbs} color={MACRO_COLORS.carbs} />
             <MacroDetail label="Fats" value={totalFat} color={MACRO_COLORS.fat} />
             <MacroDetail label="Protein" value={totalProtein} color={MACRO_COLORS.protein} />
-            <MacroDetail label="Fiber" value={totalFiber} color={MACRO_COLORS.fiber} />
           </Animated.View>
         )}
 

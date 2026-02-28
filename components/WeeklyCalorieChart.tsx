@@ -15,7 +15,7 @@ import {
 } from '@shopify/react-native-skia'
 import { GlassView } from 'expo-glass-effect'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Dimensions, View, useColorScheme } from 'react-native'
+import { View, useColorScheme, useWindowDimensions } from 'react-native'
 import {
   Easing,
   type SharedValue,
@@ -27,7 +27,6 @@ import {
   withTiming,
 } from 'react-native-reanimated'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
 const CHART_HEIGHT = 160
 const PAD = { top: 20, right: 16, bottom: 4, left: 16 }
 const DOT_R = 4
@@ -63,11 +62,12 @@ function Dot({
 type Props = { calorieGoal: number }
 
 export default function WeeklyCalorieChart({ calorieGoal }: Props) {
+  const { width: screenWidth } = useWindowDimensions()
   const colorScheme = useColorScheme()
   const theme = colors[colorScheme ?? 'light']
   const scrollPosition = useContext(ScrollPositionContext)
 
-  const chartW = SCREEN_WIDTH - 64
+  const chartW = screenWidth - 64
   const drawW = chartW - PAD.left - PAD.right
   const drawH = CHART_HEIGHT - PAD.top - PAD.bottom
 
@@ -230,7 +230,7 @@ export default function WeeklyCalorieChart({ calorieGoal }: Props) {
 
             {/* Data dots */}
             {pts.map((pt, i) => (
-              <Dot key={i} cx={pt.x} cy={pt.y} color={lineCol} index={i} total={pts.length} progress={progress} />
+              <Dot key={`dot-${pt.x}-${pt.y}`} cx={pt.x} cy={pt.y} color={lineCol} index={i} total={pts.length} progress={progress} />
             ))}
           </Canvas>
 
@@ -242,8 +242,8 @@ export default function WeeklyCalorieChart({ calorieGoal }: Props) {
 
         {/* X-axis labels */}
         <View className="flex-row justify-between mt-1" style={{ paddingHorizontal: PAD.left }}>
-          {data.map((d, i) => (
-            <Text key={i} className="text-muted text-[10px] text-center w-[30px]">
+          {data.map((d) => (
+            <Text key={d.day} className="text-muted text-[10px] text-center w-[30px]">
               {d.day}
             </Text>
           ))}

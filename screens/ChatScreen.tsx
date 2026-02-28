@@ -395,6 +395,10 @@ export default function ChatScreen() {
     }
   }, [cardVisible, scrollToBottom])
 
+  const renderItem = useCallback(({ item }: { item: UIMessage }) => (
+    <MessageBubble message={item} />
+  ), [])
+
   if (error) return <Text>{error.message}</Text>
 
   return (
@@ -415,9 +419,7 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <MessageBubble message={item} />
-          )}
+          renderItem={renderItem}
           contentContainerStyle={{
             paddingTop: headerHeight + 8,
           }}

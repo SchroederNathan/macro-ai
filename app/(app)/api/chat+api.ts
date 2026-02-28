@@ -7,6 +7,87 @@ import {
 
 const USDA_API_KEY = process.env.USDA_API_KEY;
 const USDA_BASE_URL = 'https://api.nal.usda.gov/fdc/v1';
+const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
+
+/**
+ * Search Perplexity Sonar for nutrition info — used as a smarter fallback
+ * when USDA doesn't have a good match (branded foods, restaurant items, etc.)
+ */
+async function searchPerplexityNutrition(foodQuery: string): Promise<{
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  sugar: number;
+  servingDescription?: string;
+} | null> {
+  if (!PERPLEXITY_API_KEY) return null;
+
+  try {
+    console.log('[PERPLEXITY] Searching for:', foodQuery);
+    const res = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a nutrition data lookup tool. Return ONLY valid JSON with no other text. Search for accurate nutrition information for the requested food.',
+          },
+          {
+            role: 'user',
+            content: `What are the nutrition facts for one serving of "${foodQuery}"? If this is a restaurant or branded item, use the actual published nutrition data. Return ONLY this JSON format, no other text:\n{"calories":0,"protein":0,"carbs":0,"fat":0,"fiber":0,"sugar":0,"servingDescription":"1 medium"}`,
+          },
+        ],
+        temperature: 0.1,
+      }),
+    });
+
+    if (!res.ok) {
+      console.log('[PERPLEXITY] API error:', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) return null;
+
+    // Extract JSON from the response (handle markdown code blocks)
+    const jsonMatch = content.match(/\{[\s\S]*?\}/);
+    if (!jsonMatch) {
+      console.log('[PERPLEXITY] Could not parse JSON from:', content);
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const result = {
+      calories: Math.round(Number(parsed.calories) || 0),
+      protein: Math.round((Number(parsed.protein) || 0) * 10) / 10,
+      carbs: Math.round((Number(parsed.carbs) || 0) * 10) / 10,
+      fat: Math.round((Number(parsed.fat) || 0) * 10) / 10,
+      fiber: Math.round((Number(parsed.fiber) || 0) * 10) / 10,
+      sugar: Math.round((Number(parsed.sugar) || 0) * 10) / 10,
+      servingDescription: parsed.servingDescription,
+    };
+
+    // Sanity check — if everything is 0, it's not useful
+    if (result.calories === 0 && result.protein === 0 && result.carbs === 0) {
+      console.log('[PERPLEXITY] All zeros, discarding');
+      return null;
+    }
+
+    console.log('[PERPLEXITY] Result:', result);
+    return result;
+  } catch (error) {
+    console.error('[PERPLEXITY] Error:', error);
+    return null;
+  }
+}
 
 /**
  * Enhance query for better USDA search results
@@ -59,7 +140,7 @@ export async function POST(req: Request) {
         execute: async ({ foodQuery, displayName, quantity = 1, meal, estimatedCalories, estimatedProtein, estimatedCarbs, estimatedFat, estimatedFiber, estimatedSugar }) => {
           console.log('[LOOKUP] Searching for:', foodQuery);
 
-          // LLM-provided fallback macros (per serving)
+          // LLM-provided fallback macros (per serving) — last resort after Perplexity
           const hasLLMEstimate = estimatedCalories !== undefined || estimatedProtein !== undefined;
           const llmFallback = hasLLMEstimate ? {
             calories: Math.round(estimatedCalories ?? 100),
@@ -70,27 +151,42 @@ export async function POST(req: Request) {
             sugar: Math.round((estimatedSugar ?? 0) * 10) / 10,
           } : null;
 
-          if (!USDA_API_KEY) {
-            if (llmFallback) {
-              console.log('[LOOKUP] No API key, using LLM estimate:', llmFallback);
-              return {
-                success: true,
-                entry: {
-                  name: displayName,
-                  quantity,
-                  serving: { amount: 1, unit: 'serving', gramWeight: 100 },
-                  nutrients: llmFallback,
-                  meal,
-                },
-                estimated: true,
-                message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
-              };
+          // Helper: build a successful entry from any nutrient source
+          const buildEntry = (nutrients: { calories: number; protein: number; carbs: number; fat: number; fiber: number; sugar: number }, source: 'usda' | 'perplexity' | 'estimate', servingDesc?: string) => ({
+            success: true,
+            entry: {
+              name: displayName,
+              quantity,
+              serving: { amount: 1, unit: servingDesc || 'serving', gramWeight: 100 },
+              nutrients,
+              meal,
+            },
+            estimated: source !== 'usda',
+            source,
+            message: `Logged ${quantity} ${displayName} (${source === 'usda' ? '' : source + ': '}${nutrients.calories} cal)`,
+          });
+
+          // Helper: try Perplexity, then LLM estimate, then return null
+          const tryFallbacks = async () => {
+            const pplx = await searchPerplexityNutrition(foodQuery);
+            if (pplx) {
+              console.log('[LOOKUP] Source: Perplexity |', displayName, pplx.calories, 'cal');
+              return buildEntry(pplx, 'perplexity', pplx.servingDescription);
             }
-            // No API key and no LLM estimate - return failure so LLM can retry with estimates
-            console.log('[LOOKUP] No API key and no estimates provided');
+            if (llmFallback) {
+              console.log('[LOOKUP] Source: LLM estimate |', displayName, llmFallback.calories, 'cal');
+              return buildEntry(llmFallback, 'estimate');
+            }
+            return null;
+          };
+
+          if (!USDA_API_KEY) {
+            console.log('[LOOKUP] No USDA API key, trying fallbacks');
+            const fallback = await tryFallbacks();
+            if (fallback) return fallback;
             return {
               success: false,
-              error: 'USDA API key not configured. Please provide estimated macros.',
+              error: 'No API keys configured. Please provide estimated macros.',
               message: 'Could not look up food. Please provide your best estimate for calories, protein, carbs, and fat.',
             };
           }
@@ -112,21 +208,8 @@ export async function POST(req: Request) {
             // Handle non-OK responses
             if (!searchRes.ok) {
               console.log('[LOOKUP] USDA search failed:', searchRes.status, searchRes.statusText);
-              if (llmFallback) {
-                console.log('[LOOKUP] Using LLM estimate:', llmFallback);
-                return {
-                  success: true,
-                  entry: {
-                    name: displayName,
-                    quantity,
-                    serving: { amount: 1, unit: 'serving', gramWeight: 100 },
-                    nutrients: llmFallback,
-                    meal,
-                  },
-                  estimated: true,
-                  message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
-                };
-              }
+              const fallback = await tryFallbacks();
+              if (fallback) return fallback;
               throw new Error(`USDA API error: ${searchRes.status}`);
             }
 
@@ -141,28 +224,14 @@ export async function POST(req: Request) {
             }
 
             if (!searchData.foods?.length) {
-              if (llmFallback) {
-                console.log('[LOOKUP] No USDA results, using LLM estimate:', llmFallback);
-                return {
-                  success: true,
-                  entry: {
-                    name: displayName,
-                    quantity,
-                    serving: { amount: 1, unit: 'serving', gramWeight: 100 },
-                    nutrients: llmFallback,
-                    meal,
-                  },
-                  estimated: true,
-                  message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
-                };
-              }
-              // No results and no LLM estimate - return failure so LLM can retry with estimates
-              console.log('[LOOKUP] No USDA results and no estimates provided');
+              console.log('[LOOKUP] No USDA results, trying fallbacks');
+              const fallback = await tryFallbacks();
+              if (fallback) return fallback;
               return {
                 success: false,
-                error: 'Food not found in USDA database. Please provide estimated macros.',
+                error: 'Food not found. Please provide estimated macros.',
                 foodQuery,
-                message: `Could not find "${foodQuery}" in database. Please provide your best estimate for calories, protein, carbs, and fat.`,
+                message: `Could not find "${foodQuery}". Please provide your best estimate for calories, protein, carbs, and fat.`,
               };
             }
 
@@ -181,21 +250,11 @@ export async function POST(req: Request) {
               }
             }
 
-            // If no query words match the best result, prefer LLM estimate
-            if (bestMatchCount === 0 && llmFallback) {
-              console.log('[LOOKUP] No good USDA match, using LLM estimate:', llmFallback);
-              return {
-                success: true,
-                entry: {
-                  name: displayName,
-                  quantity,
-                  serving: { amount: 1, unit: 'serving', gramWeight: 100 },
-                  nutrients: llmFallback,
-                  meal,
-                },
-                estimated: true,
-                message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
-              };
+            // If no query words match, USDA result is likely wrong — try Perplexity first
+            if (bestMatchCount === 0) {
+              console.log('[LOOKUP] No good USDA match, trying fallbacks');
+              const fallback = await tryFallbacks();
+              if (fallback) return fallback;
             }
 
             const fdcId = bestMatch.fdcId;
@@ -206,21 +265,8 @@ export async function POST(req: Request) {
 
             if (!detailRes.ok) {
               console.log('[LOOKUP] USDA detail fetch failed:', detailRes.status, detailRes.statusText);
-              if (llmFallback) {
-                console.log('[LOOKUP] Using LLM estimate:', llmFallback);
-                return {
-                  success: true,
-                  entry: {
-                    name: displayName,
-                    quantity,
-                    serving: { amount: 1, unit: 'serving', gramWeight: 100 },
-                    nutrients: llmFallback,
-                    meal,
-                  },
-                  estimated: true,
-                  message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
-                };
-              }
+              const fallback = await tryFallbacks();
+              if (fallback) return fallback;
               throw new Error(`USDA API error: ${detailRes.status}`);
             }
 
@@ -228,9 +274,6 @@ export async function POST(req: Request) {
             console.log('[LOOKUP] Fetched food:', food.description);
 
             // Extract macros - handle multiple nutrient ID formats
-            // SR Legacy uses: nutrientId + value
-            // Foundation uses: nutrient.id + amount
-            // Foundation also uses different Energy IDs (2047, 2048 instead of 1008)
             const getNutrient = (ids: number[]) => {
               for (const id of ids) {
                 const n = food.foodNutrients?.find((n: any) =>
@@ -265,28 +308,14 @@ export async function POST(req: Request) {
               sugar: Math.round(getNutrient([2000, 1063, 269]) * 10) / 10,
             };
 
-            // Validate: if all macros are 0, use LLM fallback or return error
+            // Validate: if all macros are 0, try fallbacks
             if (macros.calories === 0 && macros.protein === 0 && macros.carbs === 0 && macros.fat === 0) {
-              if (llmFallback) {
-                console.log('[LOOKUP] No valid nutrients in USDA, using LLM estimate:', llmFallback);
-                return {
-                  success: true,
-                  entry: {
-                    name: displayName,
-                    quantity,
-                    serving: { amount: 1, unit: 'serving', gramWeight: 100 },
-                    nutrients: llmFallback,
-                    meal,
-                    fdcId,
-                  },
-                  estimated: true,
-                  message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
-                };
-              }
-              console.log('[LOOKUP] No valid nutrients and no estimates provided');
+              console.log('[LOOKUP] No valid nutrients in USDA, trying fallbacks');
+              const fallback = await tryFallbacks();
+              if (fallback) return fallback;
               return {
                 success: false,
-                error: 'USDA data incomplete. Please provide estimated macros.',
+                error: 'Nutrient data incomplete. Please provide estimated macros.',
                 foodQuery,
                 fdcId,
                 message: `Found "${food.description}" but nutrient data is incomplete. Please provide your best estimate.`,
@@ -298,7 +327,6 @@ export async function POST(req: Request) {
             // Get a reasonable serving size - prefer medium-sized portions
             let portion = food.foodPortions?.[0];
 
-            // Try to find a "medium" or standard portion if available
             if (food.foodPortions && food.foodPortions.length > 1) {
               const mediumPortion = food.foodPortions.find((p: any) =>
                 p.modifier?.toLowerCase().includes('medium') ||
@@ -328,8 +356,7 @@ export async function POST(req: Request) {
               sugar: Math.round(macros.sugar * scale * 10) / 10,
             };
 
-            console.log('[LOOKUP] Final entry:', displayName, nutrients.calories, 'cal per', serving.unit);
-            console.log('[LOOKUP] Macros:', nutrients);
+            console.log('[LOOKUP] Source: USDA |', displayName, nutrients.calories, 'cal per', serving.unit);
 
             return {
               success: true,
@@ -342,25 +369,13 @@ export async function POST(req: Request) {
                 fdcId,
               },
               estimated: false,
+              source: 'usda',
               message: `Logged ${quantity} ${serving.unit} ${displayName} - ${nutrients.calories * quantity} cal, ${nutrients.protein * quantity}g protein`,
             };
           } catch (error) {
             console.error('[LOOKUP] Error:', error);
-            if (llmFallback) {
-              console.log('[LOOKUP] API error, using LLM estimate:', llmFallback);
-              return {
-                success: true,
-                entry: {
-                  name: displayName,
-                  quantity,
-                  serving: { amount: 1, unit: 'serving', gramWeight: 100 },
-                  nutrients: llmFallback,
-                  meal,
-                },
-                estimated: true,
-                message: `Logged ${quantity} ${displayName} (estimated: ${llmFallback.calories} cal)`,
-              };
-            }
+            const fallback = await tryFallbacks();
+            if (fallback) return fallback;
             return {
               success: false,
               error: 'API error occurred. Please provide estimated macros.',

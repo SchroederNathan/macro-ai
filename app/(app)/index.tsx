@@ -8,13 +8,11 @@ import { GlassView } from 'expo-glass-effect'
 import { MeshGradientView } from 'expo-mesh-gradient'
 import { Stack } from 'expo-router'
 import { createContext, useCallback, useContext, useMemo, useRef } from 'react'
-import { Dimensions, StyleSheet, useColorScheme, View } from 'react-native'
+import { StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import PagerView from 'react-native-pager-view'
 import Animated, { Extrapolation, interpolate, runOnJS, SharedValue, useAnimatedStyle, useDerivedValue, useEvent, useHandler, useSharedValue } from 'react-native-reanimated'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
-
-const SCREEN_WIDTH = Dimensions.get('window').width
 
 // Context to share scroll position with child screens
 export const ScrollPositionContext = createContext<SharedValue<number> | null>(null)
@@ -68,6 +66,7 @@ type CubePageProps = {
 }
 
 function CubePage({ pageIndex, scrollPosition, children }: CubePageProps) {
+  const { width: screenWidth } = useWindowDimensions()
   const currentIndex = useDerivedValue(() => {
     return Math.floor(scrollPosition.value)
   })
@@ -88,7 +87,7 @@ function CubePage({ pageIndex, scrollPosition, children }: CubePageProps) {
       return {
         transformOrigin: 'right',
         transform: [
-          { perspective: SCREEN_WIDTH * 4 },
+          { perspective: screenWidth * 4 },
           { scaleY },
           { rotateY: `${rotateY}deg` },
         ],
@@ -101,7 +100,7 @@ function CubePage({ pageIndex, scrollPosition, children }: CubePageProps) {
       return {
         transformOrigin: 'left',
         transform: [
-          { perspective: SCREEN_WIDTH * 4 },
+          { perspective: screenWidth * 4 },
           { scaleY },
           { rotateY: `${rotateY}deg` },
         ],
@@ -207,6 +206,7 @@ function AnimatedMeshBackground({ scrollPosition }: { scrollPosition: SharedValu
 }
 
 function AnimatedChatGradient({ scrollPosition }: { scrollPosition: SharedValue<number> }) {
+  const { width: screenWidth } = useWindowDimensions()
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
 
@@ -220,7 +220,7 @@ function AnimatedChatGradient({ scrollPosition }: { scrollPosition: SharedValue<
       style={[{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 }, animatedStyle]}
       pointerEvents="none"
     >
-      <Svg style={{ width: SCREEN_WIDTH, height: 100 }}>
+      <Svg style={{ width: screenWidth, height: 100 }}>
         <Defs>
           <RadialGradient id="chatGrad" cx="50%" cy="100%" r="100%">
             <Stop offset="0%" stopColor={isDark ? colors.dark.primary : colors.light.primary} stopOpacity="0.3" />
@@ -327,8 +327,8 @@ export default function PagerScreen() {
                         <Stack.Toolbar placement="right" >
                           <Stack.Toolbar.Menu>
                             <Stack.Toolbar.Icon sf="sparkles" />
-                            <Stack.Toolbar.Label>Test menui</Stack.Toolbar.Label>
-                            <Stack.Toolbar.MenuAction onPress={() => { }}>Action 1</Stack.Toolbar.MenuAction>
+                            <Stack.Toolbar.Label><Text>Test menui</Text></Stack.Toolbar.Label>
+                            <Stack.Toolbar.MenuAction onPress={() => { }}><Text>Action 1</Text></Stack.Toolbar.MenuAction>
                           </Stack.Toolbar.Menu>
                         </Stack.Toolbar>
                         <PagerContent scrollPosition={scrollPosition} pagerRef={pagerRef} />
