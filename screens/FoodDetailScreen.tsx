@@ -27,13 +27,10 @@ function PendingEntryRow({
   onRemove: (index: number) => void
 }) {
   const handleDecrement = useCallback(() => {
+    if (entry.quantity <= 1) return
     Haptics.selection()
-    if (entry.quantity <= 1) {
-      onRemove(index)
-    } else {
-      onQuantityChange(index, entry.quantity - 1)
-    }
-  }, [entry.quantity, index, onQuantityChange, onRemove])
+    onQuantityChange(index, entry.quantity - 1)
+  }, [entry.quantity, index, onQuantityChange])
 
   const handleIncrement = useCallback(() => {
     Haptics.selection()
@@ -184,16 +181,12 @@ export default function FoodDetailScreen() {
   }, [storeEntry, loggedQuantity, updateEntry])
 
   const handleLoggedDecrement = useCallback(() => {
-    if (!storeEntry) return
+    if (!storeEntry || loggedQuantity <= 1) return
     Haptics.selection()
-    if (loggedQuantity <= 1) {
-      handleLoggedDelete()
-    } else {
-      const newQ = loggedQuantity - 1
-      setLoggedQuantity(newQ)
-      updateEntry(storeEntry.id, { quantity: newQ })
-    }
-  }, [storeEntry, loggedQuantity, updateEntry, handleLoggedDelete])
+    const newQ = loggedQuantity - 1
+    setLoggedQuantity(newQ)
+    updateEntry(storeEntry.id, { quantity: newQ })
+  }, [storeEntry, loggedQuantity, updateEntry])
 
   const handlePendingQuantityChange = useCallback((index: number, newQuantity: number) => {
     if (newQuantity < 1) {

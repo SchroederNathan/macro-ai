@@ -1,9 +1,10 @@
 import { GlassContainer, GlassView } from 'expo-glass-effect'
-import { forwardRef, type ReactNode, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, type ReactNode, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Platform, Pressable, TextInput, type TextInputProps, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
   interpolate,
+  runOnJS,
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
@@ -33,24 +34,6 @@ const BUTTON_SIZE = 40
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView)
 
-const topContentEntering = (values: any) => {
-  'worklet'
-  return {
-    initialValues: { transform: [{ translateY: values.targetHeight }] },
-    animations: { transform: [{ translateY: withSpring(0) }] },
-  }
-}
-
-const topContentExiting = (values: any) => {
-  'worklet'
-  return {
-    initialValues: { transform: [{ translateY: 0 }] },
-    animations: {
-      transform: [{ translateY: withTiming(values.currentHeight, { duration: 350, easing: Easing.out(Easing.cubic) }) }],
-    },
-  }
-}
-
 export const MIN_INPUT_HEIGHT = 56
 export const MAX_INPUT_HEIGHT = 112
 
@@ -63,10 +46,12 @@ export type AnimatedInputProps = TextInputProps & {
   onFocusChange?: (focused: boolean) => void
   /** Content rendered above the input, anchored to its top edge */
   topContent?: ReactNode
+  /** Whether the top content should be visible (controls enter/exit animation) */
+  topContentVisible?: boolean
 }
 
 export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(function AnimatedInput(
-  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, topContent, ...textInputProps },
+  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, topContent, topContentVisible, ...textInputProps },
   ref
 ) {
   const [value, setValue] = useState('')
@@ -90,6 +75,62 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
   // Tint colors for glass effect
   const containerTint = isDark ? '#27272a' : '#f4f4f5'
   const buttonTint = isDark ? colors.dark.primary : '#2563eb'
+
+  // Top content animation state
+  const topContentRef = useRef<ReactNode>(null)
+  const [topContentMounted, setTopContentMounted] = useState(false)
+  const topContentTranslateY = useSharedValue(0)
+  const topContentHeightSV = useSharedValue(0)
+  const isEnteringRef = useRef(false)
+
+  // Cache content so it persists during exit animation
+  if (topContent) topContentRef.current = topContent
+
+  const shouldBeVisible = topContentVisible ?? !!topContent
+
+  useEffect(() => {
+    if (shouldBeVisible && (topContent || topContentRef.current)) {
+      if (!topContentMounted) {
+        isEnteringRef.current = true
+        topContentTranslateY.value = 1000 // start off-screen until onLayout measures
+        setTopContentMounted(true)
+      }
+    } else if (!shouldBeVisible && topContentMounted) {
+      // Animate exit: slide down by the card's height
+      topContentTranslateY.value = withTiming(
+        topContentHeightSV.value,
+        { duration: 350, easing: Easing.out(Easing.cubic) },
+        (finished) => {
+          if (finished) {
+            runOnJS(setTopContentMounted)(false)
+          }
+        }
+      )
+    }
+  }, [shouldBeVisible])
+
+  // Reset refs when fully unmounted
+  useEffect(() => {
+    if (!topContentMounted && !shouldBeVisible) {
+      topContentRef.current = null
+      topContentTranslateY.value = 0
+    }
+  }, [topContentMounted, shouldBeVisible])
+
+  const handleTopContentLayout = useCallback((e: any) => {
+    const height = e.nativeEvent.layout.height
+    topContentHeightSV.value = height
+    if (isEnteringRef.current) {
+      isEnteringRef.current = false
+      // Start from below (translated by card height), spring up to 0
+      topContentTranslateY.value = height
+      topContentTranslateY.value = withSpring(0)
+    }
+  }, [])
+
+  const rTopContentStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: topContentTranslateY.value }],
+  }))
 
   const focusProgress = useSharedValue(0)
   const textProgress = useSharedValue(0)
@@ -178,14 +219,12 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
 
       className="px-3"
     >
-      {topContent && (
+      {topContentMounted && (topContent || topContentRef.current) && (
         <Animated.View
-          entering={topContentEntering}
-          exiting={topContentExiting}
-          style={{ zIndex: -1 }}
-          className="px-1"
+          style={[{ zIndex: -1, paddingHorizontal: 4 }, rTopContentStyle]}
+          onLayout={handleTopContentLayout}
         >
-          {topContent}
+          {topContent || topContentRef.current}
         </Animated.View>
       )}
       <Pressable className='z-10' onPress={() => textInputRef.current?.focus()}>

@@ -495,7 +495,7 @@ export default function ChatScreen() {
         onSend={handleSend}
         hasMessages={messages.length > 0}
         keyboardHeight={keyboardHeight}
-        topContent={cardVisible ? (
+        topContent={pendingEntries.length > 0 ? (
           <View onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}>
             <FoodConfirmationCard
               entries={pendingEntries.map(p => p.entry)}
@@ -507,6 +507,7 @@ export default function ChatScreen() {
             />
           </View>
         ) : undefined}
+        topContentVisible={cardVisible}
       />
       <LinearGradient
         colors={[
