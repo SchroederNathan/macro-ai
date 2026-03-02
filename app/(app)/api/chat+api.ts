@@ -113,8 +113,8 @@ function enhanceQuery(query: string): string {
 
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
-  console.log('[CHAT API] Received', messages.length, 'messages');
+  const { messages, voiceMode }: { messages: UIMessage[]; voiceMode?: boolean } = await req.json();
+  console.log('[CHAT API] Received', messages.length, 'messages', voiceMode ? '(voice mode)' : '');
 
   const result = streamText({
     model: "google/gemini-3-flash",
@@ -465,10 +465,17 @@ Your estimates should be reasonable per-serving values. For example:
 - Cup of rice: ~205 cal, 4g protein, 45g carbs, 0.4g fat, 0.6g fiber, 0g sugar
 - Apple: ~95 cal, 0.5g protein, 25g carbs, 0.3g fat, 4g fiber, 19g sugar
 
-Keep responses short and friendly. After the tool lookup, just ask for confirmation - don't repeat all the macros since they'll see them in the confirmation card.
-Example: "Found it! Does this look right?"
+Keep responses short and friendly.${voiceMode ? '' : ` After the tool lookup, just ask for confirmation - don't repeat all the macros since they'll see them in the confirmation card.
+Example: "Found it! Does this look right?"`}
 
-If the user asks about their progress or totals, just say you've logged what they mentioned and they can check the home screen.`,
+If the user asks about their progress or totals, just say you've logged what they mentioned and they can check the home screen.${voiceMode ? `
+
+VOICE MODE — The user is speaking to you hands-free and CANNOT see the screen.
+- After a food lookup, ALWAYS tell them the key nutritional info verbally: name, calories, protein, carbs, and fat. Example: "Got it — one California Roll, that's about 255 calories, 9g protein, 38g carbs, and 7g fat. Sound right?"
+- Keep it conversational and concise — read out the important macros naturally, don't list every single nutrient.
+- The user can ask follow-up questions about the food ("how much fiber?", "what about sugar?") — answer from the tool result.
+- For clarification questions, do NOT provide options — just ask a simple open-ended question. Example: instead of listing sushi roll types, just ask "What kind of sushi roll was it?" and let them answer naturally.
+- Keep your tone warm and conversational since this is a spoken dialogue.` : ''}`,
   });
 
   return result.toUIMessageStreamResponse({

@@ -44,7 +44,20 @@
         }
       ],
       "expo-sqlite",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow macro-ai to use your microphone for voice food logging.",
+          "speechRecognitionPermission": "Allow macro-ai to use speech recognition for voice food logging."
+        }
+      ],
+      [
+        "react-native-audio-api",
+        {
+          "iosMicrophonePermission": "Allow macro-ai to use your microphone for voice food logging."
+        }
+      ]
     ],
     "extra": {
       "eas": {

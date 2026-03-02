@@ -50,10 +50,12 @@ export type AnimatedInputProps = TextInputProps & {
   topContentVisible?: boolean
   /** When true, disables the input and shows "Answer above to continue..." placeholder */
   disabled?: boolean
+  /** Called when mic button is pressed (no text entered) to enter voice mode */
+  onVoicePress?: () => void
 }
 
 export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(function AnimatedInput(
-  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, topContent, topContentVisible, disabled, ...textInputProps },
+  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, topContent, topContentVisible, disabled, onVoicePress, ...textInputProps },
   ref
 ) {
   const [value, setValue] = useState('')
@@ -347,6 +349,7 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
                 onTouchEnd={() => {
                   Haptics.selection()
                   if (hasText) handleSend()
+                  else onVoicePress?.()
                 }}
               >
                 {hasText ? (

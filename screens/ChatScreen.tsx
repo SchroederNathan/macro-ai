@@ -1,5 +1,7 @@
 import { AnimatedInput, type AnimatedInputRef, ClarificationCard, EmptyStateCarousels, FoodConfirmationCard, type FoodConfirmationEntry, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
+import { VoiceOverlay } from '@/components/chat/VoiceOverlay'
 import { colors } from '@/constants/colors'
+import { useVoiceChat } from '@/hooks/useVoiceChat'
 import { generateAPIUrl } from '@/utils'
 import { useDailyLogStore, useUserStore } from '@/stores'
 import { FoodDetailCallbackRegistryContext, PagerNavigationContext } from '@/contexts/PagerContexts'
@@ -88,8 +90,16 @@ export default function ChatScreen() {
     allowFreeform?: boolean
     context?: string
   } | null>(null)
+  const [voiceMode, setVoiceMode] = useState(false)
+  const [lastAssistantText, setLastAssistantText] = useState('')
   const prevMessageCountRef = useRef(0)
   const processedToolCallsRef = useRef<Set<string>>(new Set())
+  const voiceModeRef = useRef(false)
+  const voiceSpeakRef = useRef<(text: string) => Promise<void>>()
+  const voiceStartListeningRef = useRef<() => Promise<void>>()
+  const pendingClarificationRef = useRef<typeof pendingClarification>(null)
+  const addToolOutputRef = useRef<typeof addToolOutput>(null as any)
+  const spokenToolCallsRef = useRef<Set<string>>(new Set())
   const listRef = useRef<FlashListRef<UIMessage>>(null)
   const inputRef = useRef<AnimatedInputRef>(null)
   const insets = useSafeAreaInsets()
@@ -119,6 +129,7 @@ export default function ChatScreen() {
     transport: new DefaultChatTransport({
       fetch: expoFetch as unknown as typeof globalThis.fetch,
       api: generateAPIUrl('/api/chat'),
+      body: () => ({ voiceMode: voiceModeRef.current }),
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onError: error => {
@@ -126,14 +137,108 @@ export default function ChatScreen() {
       setIsThinking(false)
       setToolActivity({ toolName: null, toolState: null, foodQuery: null })
     },
-    onFinish: () => {
+    onFinish: ({ message }) => {
       setIsThinking(false)
       // Clear tool activity after a short delay to show completion state
       setTimeout(() => {
         setToolActivity({ toolName: null, toolState: null, foodQuery: null })
       }, 1500)
+
+      // Voice mode: speak the assistant's text response
+      // Skip if an ask_user handler already spoke this message's text
+      if (voiceModeRef.current && message.parts) {
+        const hasAskUser = message.parts.some(
+          (p: any) => p.type === 'tool-ask_user' && spokenToolCallsRef.current.has(p.toolCallId)
+        )
+        if (!hasAskUser) {
+          const textParts = message.parts
+            .filter((p: any) => p.type === 'text' && p.text?.trim())
+            .map((p: any) => p.text.trim())
+            .join(' ')
+          if (textParts) {
+            setLastAssistantText(textParts)
+            voiceSpeakRef.current?.(textParts)
+          }
+        }
+      }
     },
   })
+
+  // Voice chat hook
+  const voiceChat = useVoiceChat({
+    onTranscript: (text, isFinal) => {
+      if (isFinal && text.trim()) {
+        // If there's a pending clarification, route the answer to addToolOutput
+        const clarification = pendingClarificationRef.current
+        if (clarification) {
+          setIsThinking(true)
+          addToolOutputRef.current?.({
+            tool: 'ask_user',
+            toolCallId: clarification.toolCallId,
+            output: text,
+          })
+          setPendingClarification(null)
+        } else {
+          setIsThinking(true)
+          setToolActivity({ toolName: null, toolState: null, foodQuery: null })
+          sendMessage({ text })
+        }
+      }
+    },
+    onSpeakingEnd: () => {
+      // Auto-resume listening after TTS finishes
+      if (voiceModeRef.current) {
+        setTimeout(() => {
+          if (voiceModeRef.current) {
+            voiceStartListeningRef.current?.()
+          }
+        }, 300)
+      }
+    },
+  })
+
+  // Keep function refs in sync
+  useEffect(() => {
+    voiceSpeakRef.current = voiceChat.speak
+    voiceStartListeningRef.current = voiceChat.startListening
+  }, [voiceChat.speak, voiceChat.startListening])
+
+  useEffect(() => {
+    addToolOutputRef.current = addToolOutput
+  }, [addToolOutput])
+
+  useEffect(() => {
+    pendingClarificationRef.current = pendingClarification
+  }, [pendingClarification])
+
+  // Keep voiceModeRef in sync
+  useEffect(() => {
+    voiceModeRef.current = voiceMode
+  }, [voiceMode])
+
+  const enterVoiceMode = useCallback(() => {
+    Keyboard.dismiss()
+    setVoiceMode(true)
+    voiceModeRef.current = true
+    voiceChat.startListening()
+  }, [voiceChat])
+
+  const exitVoiceMode = useCallback(() => {
+    setVoiceMode(false)
+    voiceModeRef.current = false
+    voiceChat.stopListening()
+    voiceChat.stopSpeaking()
+  }, [voiceChat])
+
+  const handleVoiceInterrupt = useCallback(() => {
+    voiceChat.stopSpeaking()
+    // Start listening again after interrupting
+    setTimeout(() => {
+      if (voiceModeRef.current) {
+        voiceChat.startListening()
+      }
+    }, 200)
+  }, [voiceChat])
 
   // Watch messages for tool activity and results
   useEffect(() => {
@@ -147,8 +252,8 @@ export default function ChatScreen() {
     if (!lastAssistantMessage?.parts) {
       // No assistant message after last user message - clear tool activity
       if (lastUserMessageIndex === messages.length - 1) {
-        // User just sent a message, waiting for response
-        setToolActivity({ toolName: null, toolState: null, foodQuery: null })
+        // Keep isThinking true while waiting — don't clear toolActivity
+        // so the indicator persists through auto-send gaps
       }
       return
     }
@@ -206,13 +311,27 @@ export default function ChatScreen() {
               context?: string
             }
             console.log('[ASK_USER] Showing clarification card:', input.question)
-            setPendingClarification({
+            const clarificationData = {
               toolCallId,
               question: input.question,
               options: input.options,
               allowFreeform: input.allowFreeform,
               context: input.context,
-            })
+            }
+            setPendingClarification(clarificationData)
+
+            // Voice mode: speak the full assistant text (includes context + question)
+            if (voiceModeRef.current && !spokenToolCallsRef.current.has(toolCallId)) {
+              spokenToolCallsRef.current.add(toolCallId)
+              // Extract ALL text parts from this message for full context
+              const textParts = message.parts
+                .filter((p: any) => p.type === 'text' && p.text?.trim())
+                .map((p: any) => p.text.trim())
+                .join(' ')
+              const spokenText = textParts || input.question
+              setLastAssistantText(spokenText)
+              voiceSpeakRef.current?.(spokenText)
+            }
           } else if (partAny.state === 'output-available') {
             processedToolCallsRef.current.add(toolCallId)
             setPendingClarification(prev =>
@@ -406,10 +525,7 @@ export default function ChatScreen() {
 
     // Dismiss keyboard and swipe to Dashboard
     Keyboard.dismiss()
-    // Small delay so the card dismissal starts before the page swipe
-    setTimeout(() => {
-      pagerNavigation?.navigateToPage(0)
-    }, 150)
+    pagerNavigation?.navigateToPage(0)
   }, [pendingEntries, addEntry, pagerNavigation, setMessages])
 
   // Handle removing a specific entry from the pending list
@@ -466,7 +582,7 @@ export default function ChatScreen() {
   }, [pendingEntries])
 
   // Show activity indicator while thinking or tool is active
-  const showActivityIndicator = isThinking || (toolActivity.toolName && toolActivity.toolState !== 'output-available')
+  const showActivityIndicator = isThinking || toolActivity.toolName !== null
 
   // Footer component with keyboard-aware spacer
   const ListFooter = useMemo(() => (
@@ -570,6 +686,7 @@ export default function ChatScreen() {
           </View>
         ) : undefined}
         topContentVisible={!!pendingClarification || cardVisible}
+        onVoicePress={enterVoiceMode}
       />
       <LinearGradient
         colors={[
@@ -578,6 +695,22 @@ export default function ChatScreen() {
         ]}
         style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, zIndex: 0 }}
       />
+
+      {/* Voice mode overlay */}
+      {voiceMode && (
+        <VoiceOverlay
+          state={voiceChat.state}
+          interimTranscript={voiceChat.interimTranscript}
+          lastAssistantText={lastAssistantText}
+          analyserNode={voiceChat.analyserNode}
+          toolName={toolActivity.toolName}
+          toolState={toolActivity.toolState}
+          foodQuery={toolActivity.foodQuery || undefined}
+          isThinking={isThinking}
+          onClose={exitVoiceMode}
+          onTapInterrupt={handleVoiceInterrupt}
+        />
+      )}
     </View>
   )
 }
