@@ -250,11 +250,13 @@ export async function POST(req: Request) {
               }
             }
 
-            // If no query words match, USDA result is likely wrong — try Perplexity first
-            if (bestMatchCount === 0) {
-              console.log('[LOOKUP] No good USDA match, trying fallbacks');
+            // If fewer than half of query words match, USDA result is likely wrong — try fallbacks
+            const matchRatio = queryWords.length > 0 ? bestMatchCount / queryWords.length : 0;
+            if (matchRatio < 1) {
+              console.log(`[LOOKUP] Poor USDA match (${bestMatchCount}/${queryWords.length} words), trying fallbacks`);
               const fallback = await tryFallbacks();
               if (fallback) return fallback;
+              // If fallbacks also fail, continue with best USDA match as last resort
             }
 
             const fdcId = bestMatch.fdcId;
@@ -417,6 +419,19 @@ export async function POST(req: Request) {
           };
         },
       },
+      ask_user: {
+        description: 'Ask the user a clarifying question when more information is needed to accurately look up food. Use when food is ambiguous (e.g., "sushi roll", "sandwich", "coffee").',
+        inputSchema: z.object({
+          question: z.string().describe('The question to ask'),
+          options: z.array(z.object({
+            label: z.string().describe('Display text'),
+            value: z.string().describe('Value when selected'),
+          })).optional().describe('Quick-select options'),
+          allowFreeform: z.boolean().default(true).describe('Show text input for custom answers'),
+          context: z.string().optional().describe('Additional context for display'),
+        }),
+        // No execute — answer comes from client via addToolOutput
+      },
     },
     system: `You are Miro, a friendly macro-tracking assistant.
 
@@ -430,6 +445,13 @@ IMPORTANT - Adding more food to the draft:
 - When a user says "with X", "and X", "also had X", or "add X" - ONLY call the tool for the NEW item X
 - The previous items are already in the confirmation card from earlier tool calls - do NOT look them up again
 - Example: You looked up "turkey sandwich", user says "and a big mac" → ONLY call tool for "big mac" (turkey sandwich is already in the card)
+
+CLARIFICATION:
+- When food is ambiguous or could be many things, use ask_user BEFORE lookup_and_log_food
+- Good: "sushi roll" (what kind?), "sandwich" (what type?), "coffee" (what's in it?), "salad" (what kind?)
+- Don't ask for: "banana" (unambiguous), "grilled chicken breast" (specific enough)
+- Provide 3-5 helpful option suggestions when possible
+- After the user responds, use their answer to call lookup_and_log_food with the clarified food
 
 CORRECTIONS:
 - "remove the X", "delete X", "take off the X" → call remove_food_entry with the exact displayName from the original lookup

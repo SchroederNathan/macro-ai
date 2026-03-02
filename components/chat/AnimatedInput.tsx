@@ -48,10 +48,12 @@ export type AnimatedInputProps = TextInputProps & {
   topContent?: ReactNode
   /** Whether the top content should be visible (controls enter/exit animation) */
   topContentVisible?: boolean
+  /** When true, disables the input and shows "Answer above to continue..." placeholder */
+  disabled?: boolean
 }
 
 export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(function AnimatedInput(
-  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, topContent, topContentVisible, ...textInputProps },
+  { onSend, value: valueProp, onChangeText, hasMessages = false, keyboardHeight, onFocusChange, topContent, topContentVisible, disabled, ...textInputProps },
   ref
 ) {
   const [value, setValue] = useState('')
@@ -80,6 +82,7 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
   const topContentRef = useRef<ReactNode>(null)
   const [topContentMounted, setTopContentMounted] = useState(false)
   const topContentTranslateY = useSharedValue(0)
+  const topContentOpacity = useSharedValue(1)
   const topContentHeightSV = useSharedValue(0)
   const isEnteringRef = useRef(false)
 
@@ -93,10 +96,12 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
       if (!topContentMounted) {
         isEnteringRef.current = true
         topContentTranslateY.value = 1000 // start off-screen until onLayout measures
+        topContentOpacity.value = 1
         setTopContentMounted(true)
       }
     } else if (!shouldBeVisible && topContentMounted) {
-      // Animate exit: slide down by the card's height
+      // Animate exit: slide down and fade out
+      topContentOpacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) })
       topContentTranslateY.value = withTiming(
         topContentHeightSV.value,
         { duration: 350, easing: Easing.out(Easing.cubic) },
@@ -114,6 +119,7 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
     if (!topContentMounted && !shouldBeVisible) {
       topContentRef.current = null
       topContentTranslateY.value = 0
+      topContentOpacity.value = 1
     }
   }, [topContentMounted, shouldBeVisible])
 
@@ -130,6 +136,7 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
 
   const rTopContentStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: topContentTranslateY.value }],
+    opacity: topContentOpacity.value,
   }))
 
   const focusProgress = useSharedValue(0)
@@ -249,15 +256,17 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
                 onChangeText?.(text)
                 if (!isControlled) setValue(text)
               }}
-              placeholder={showAnimatedPlaceholder ? '' : 'Message...'}
+              placeholder={disabled ? 'Answer above to continue...' : showAnimatedPlaceholder ? '' : 'Message...'}
               placeholderTextColor="#71717a"
               selectionColor="#ff6900"
+              editable={!disabled}
               className="flex-1 px-5 text-foreground text-base"
               style={{
                 minHeight: MIN_INPUT_HEIGHT,
                 paddingTop: Platform.OS === 'ios' ? 14 : 16,
                 paddingBottom: Platform.OS === 'ios' ? 18 : 16,
                 fontFamily: 'Sentient Variable',
+                opacity: disabled ? 0.5 : 1,
               }}
               multiline
               onFocus={handleFocus}

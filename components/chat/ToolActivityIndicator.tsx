@@ -48,6 +48,10 @@ function getDisplayText(
     return `Updating ${foodQuery}...`
   }
 
+  if (toolName === 'tool-ask_user') {
+    return 'Asking a question...'
+  }
+
   if (toolName) {
     return 'Searching...'
   }

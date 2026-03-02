@@ -1,4 +1,4 @@
-import { AnimatedInput, type AnimatedInputRef, EmptyStateCarousels, FoodConfirmationCard, type FoodConfirmationEntry, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
+import { AnimatedInput, type AnimatedInputRef, ClarificationCard, EmptyStateCarousels, FoodConfirmationCard, type FoodConfirmationEntry, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
 import { colors } from '@/constants/colors'
 import { generateAPIUrl } from '@/utils'
 import { useDailyLogStore, useUserStore } from '@/stores'
@@ -6,7 +6,7 @@ import { FoodDetailCallbackRegistryContext, PagerNavigationContext } from '@/con
 import { useChat } from '@ai-sdk/react'
 import { FlashList, type FlashListRef } from '@shopify/flash-list'
 import type { UIMessage } from 'ai'
-import { DefaultChatTransport } from 'ai'
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
 import { fetch as expoFetch } from 'expo/fetch'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -81,6 +81,13 @@ export default function ChatScreen() {
   const [showCard, setShowCard] = useState(false)
   const [mealTitle, setMealTitle] = useState<string | null>(null)
   const [isTitleLoading, setIsTitleLoading] = useState(false)
+  const [pendingClarification, setPendingClarification] = useState<{
+    toolCallId: string
+    question: string
+    options?: { label: string; value: string }[]
+    allowFreeform?: boolean
+    context?: string
+  } | null>(null)
   const prevMessageCountRef = useRef(0)
   const processedToolCallsRef = useRef<Set<string>>(new Set())
   const listRef = useRef<FlashListRef<UIMessage>>(null)
@@ -108,11 +115,12 @@ export default function ChatScreen() {
     loadUserStore()
   }, [loadDailyLog, loadUserStore])
 
-  const { messages, error, sendMessage } = useChat({
+  const { messages, error, sendMessage, addToolOutput, setMessages } = useChat({
     transport: new DefaultChatTransport({
       fetch: expoFetch as unknown as typeof globalThis.fetch,
       api: generateAPIUrl('/api/chat'),
     }),
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onError: error => {
       console.error(error, 'ERROR')
       setIsThinking(false)
@@ -186,7 +194,35 @@ export default function ChatScreen() {
         // Skip if already processed
         if (processedToolCallsRef.current.has(toolCallId)) continue
 
-        // Only process completed tool calls
+        // Handle ask_user BEFORE the output-available guard — this tool has no
+        // server-side execute, so it arrives with state 'input-available' and
+        // waits for the client to supply a result via addToolOutput.
+        if (part.type === 'tool-ask_user') {
+          if (partAny.state === 'input-available' && !partAny.output) {
+            const input = partAny.input as {
+              question: string
+              options?: { label: string; value: string }[]
+              allowFreeform?: boolean
+              context?: string
+            }
+            console.log('[ASK_USER] Showing clarification card:', input.question)
+            setPendingClarification({
+              toolCallId,
+              question: input.question,
+              options: input.options,
+              allowFreeform: input.allowFreeform,
+              context: input.context,
+            })
+          } else if (partAny.state === 'output-available') {
+            processedToolCallsRef.current.add(toolCallId)
+            setPendingClarification(prev =>
+              prev?.toolCallId === toolCallId ? null : prev
+            )
+          }
+          continue
+        }
+
+        // Only process completed tool calls (tools with server-side execute)
         if (partAny.state !== 'output-available' || !partAny.output) continue
 
         if (part.type === 'tool-lookup_and_log_food') {
@@ -318,6 +354,18 @@ export default function ChatScreen() {
     sendMessage({ text })
   }, [sendMessage])
 
+  const handleClarificationAnswer = useCallback((answer: string) => {
+    if (!pendingClarification) return
+    Haptics.selection()
+    setIsThinking(true)
+    addToolOutput({
+      tool: 'ask_user',
+      toolCallId: pendingClarification.toolCallId,
+      output: answer,
+    })
+    setPendingClarification(null)
+  }, [pendingClarification, addToolOutput])
+
   // Helper to get default meal based on time of day
   const getDefaultMeal = (): 'breakfast' | 'lunch' | 'dinner' | 'snack' => {
     const hour = new Date().getHours()
@@ -353,13 +401,16 @@ export default function ChatScreen() {
     // Delay clearing entries so card exits with full content visible
     setTimeout(() => setPendingEntries([]), 400)
 
+    // Clear chat messages after successful log
+    setMessages([])
+
     // Dismiss keyboard and swipe to Dashboard
     Keyboard.dismiss()
     // Small delay so the card dismissal starts before the page swipe
     setTimeout(() => {
       pagerNavigation?.navigateToPage(0)
     }, 150)
-  }, [pendingEntries, addEntry, pagerNavigation])
+  }, [pendingEntries, addEntry, pagerNavigation, setMessages])
 
   // Handle removing a specific entry from the pending list
   const handleRemoveEntry = useCallback((index: number) => {
@@ -495,7 +546,18 @@ export default function ChatScreen() {
         onSend={handleSend}
         hasMessages={messages.length > 0}
         keyboardHeight={keyboardHeight}
-        topContent={pendingEntries.length > 0 ? (
+        disabled={!!pendingClarification}
+        topContent={pendingClarification ? (
+          <View onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}>
+            <ClarificationCard
+              question={pendingClarification.question}
+              options={pendingClarification.options}
+              allowFreeform={pendingClarification.allowFreeform}
+              context={pendingClarification.context}
+              onSubmit={handleClarificationAnswer}
+            />
+          </View>
+        ) : pendingEntries.length > 0 ? (
           <View onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}>
             <FoodConfirmationCard
               entries={pendingEntries.map(p => p.entry)}
@@ -507,7 +569,7 @@ export default function ChatScreen() {
             />
           </View>
         ) : undefined}
-        topContentVisible={cardVisible}
+        topContentVisible={!!pendingClarification || cardVisible}
       />
       <LinearGradient
         colors={[
