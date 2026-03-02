@@ -17,7 +17,7 @@
             --color-muted: #a3a3a3;
             --color-chat: oklch(20.5% 0 0);
             --color-muted-foreground: oklch(26.9% 0 0);
-            --color-card: oklch(18.5% 0 0);
+            --color-card: #111111;
             --color-border: oklch(26.9% 0 0);
             --color-user-bubble: #1e3a8a;
 

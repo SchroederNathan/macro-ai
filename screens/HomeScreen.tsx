@@ -4,28 +4,13 @@ import { FoodHistory } from "@/components/FoodEntryCard"
 import MacroProgress from "@/components/MacroProgress"
 import WeeklyCalorieChart from "@/components/WeeklyCalorieChart"
 import { useDailyLogStore, useUserStore } from "@/stores"
-import { useIsFocused } from "@react-navigation/native"
 import { useCallback, useEffect } from "react"
 import { ScrollView, View } from "react-native"
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 export default function HomeScreen() {
     const insets = useSafeAreaInsets()
     const headerHeight = insets.top + 44
-    const isFocused = useIsFocused()
-
-    // Dim overlay when modal is open (this screen loses focus)
-    const dimOpacity = useSharedValue(0)
-    useEffect(() => {
-        dimOpacity.set(withTiming(isFocused ? 0 : 1, { duration: 300 }))
-    }, [isFocused, dimOpacity])
-    const dimStyle = useAnimatedStyle(() => ({
-        position: 'absolute' as const,
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: `rgba(0,0,0,${dimOpacity.value * 0.5})`,
-        zIndex: dimOpacity.value > 0 ? 10 : -1,
-    }))
 
     // Subscribe to specific values from stores (this ensures re-renders)
     const calories = useDailyLogStore(state => state.log.totals.calories)
@@ -86,8 +71,6 @@ export default function HomeScreen() {
                     {/* <WeeklyCalorieChart calorieGoal={targetCalories} /> */}
                 </View>
             </ScrollView>
-            {/* Dim overlay — renders on the home screen, below shared transitions and the modal */}
-            <Animated.View style={dimStyle} pointerEvents="none" />
         </View>
     )
 }

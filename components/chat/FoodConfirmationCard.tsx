@@ -1,8 +1,8 @@
 import { AnimatedValue } from '@/components/ui/AnimatedValue'
+import { GradientBorderCard } from '@/components/ui/GradientBorderCard'
 import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
 import { useRouter } from 'expo-router'
-import { GlassView } from 'expo-glass-effect'
 import { Minus, Plus, X } from 'lucide-react-native'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, useColorScheme, View } from 'react-native'
@@ -13,13 +13,10 @@ import Animated, {
   FadeOut,
   FadeOutDown,
   LinearTransition,
-  SharedTransition,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated'
-
-const SHARED_TRANSITION = SharedTransition.duration(550).springify()
 import { ShimmerText } from './ShimmerText'
 
 const entryLayoutTransition = LinearTransition.springify()
@@ -299,18 +296,9 @@ export function FoodConfirmationCard({
 
   return (
     <View className="mx-1 -mb-2">
-      <Animated.View sharedTransitionTag="food-confirm-card" sharedTransitionStyle={SHARED_TRANSITION}>
-      <GlassView
-        isInteractive
-        style={{
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
-          borderCurve: 'continuous',
-          padding: 16,
-          paddingBottom: 24,
-        }}
+      <GradientBorderCard
+        borderRadius={{ topLeft: 20, topRight: 20, bottomLeft: 0, bottomRight: 0 }}
+        padding={{ padding: 16, paddingBottom: 24 }}
       >
         {/* Header: Title + Edit */}
         <Pressable onPress={handleNavigateToDetail}>
@@ -399,26 +387,24 @@ export function FoodConfirmationCard({
 
         {/* Log Button */}
         <Animated.View layout={entryLayoutTransition}>
-          <GlassView
+          <Pressable
+            onPress={handleConfirm}
+            disabled={isEmpty}
             style={{
               borderRadius: 12,
               borderCurve: 'continuous',
               paddingVertical: 12,
               alignItems: 'center',
-              justifyContent: 'center',
               opacity: isEmpty ? 0.5 : 1,
+              backgroundColor: isEmpty ? undefined : theme.primary,
             }}
-            tintColor={isEmpty ? undefined : theme.primary}
-            isInteractive={!isEmpty}
-            onTouchEnd={handleConfirm}
           >
             <Text className={`text-base font-semibold ${isEmpty ? 'text-muted' : 'text-white'}`}>
               Log
             </Text>
-          </GlassView>
+          </Pressable>
         </Animated.View>
-      </GlassView>
-      </Animated.View>
+      </GradientBorderCard>
     </View>
   )
 }

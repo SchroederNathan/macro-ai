@@ -21,10 +21,10 @@ export default function AppLayout() {
             <Stack.Screen
               name="food-detail"
               options={{
-                presentation: 'transparentModal',
-                animation: 'none',
-                gestureEnabled: false,
-                contentStyle: { backgroundColor: 'transparent' },
+                presentation: 'formSheet',
+                headerShown: false,
+                sheetGrabberVisible: true,
+                sheetAllowedDetents: 'fitToContents',
               }}
             />
           </Stack>

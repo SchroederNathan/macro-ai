@@ -1,3 +1,4 @@
+import { GradientBorderCard } from '@/components/ui/GradientBorderCard'
 import { Text } from '@/components/ui/Text'
 import { scaleMacros, type FoodLogEntry } from '@/types/nutrition'
 
@@ -8,10 +9,7 @@ import { Haptics } from 'react-native-nitro-haptics'
 import Animated, {
   FadeInUp,
   LinearTransition,
-  SharedTransition,
 } from 'react-native-reanimated'
-
-const SHARED_TRANSITION = SharedTransition.duration(550).springify()
 
 const MACRO_COLORS = {
   protein: '#22C55E',
@@ -59,125 +57,59 @@ const FoodEntryCard = memo(function FoodEntryCard({ entry, index }: FoodEntryCar
       layout={cardLayoutTransition}
     >
       <Pressable onPress={handlePress}>
-        <View style={{ position: 'relative' }}>
-          {/* Card background — shared element that morphs to detail screen */}
-          <Animated.View
-            sharedTransitionTag={`food-card-${entry.id}`}
-            sharedTransitionStyle={SHARED_TRANSITION}
-            className="bg-card"
-            style={{
-              position: 'absolute',
-              top: 0, left: 0, right: 0, bottom: 0,
-              borderRadius: 16,
-              borderCurve: 'continuous',
-            }}
-          />
+        <GradientBorderCard borderRadius={16} padding={14}>
+          {/* Top row: name + time/meal */}
+          <View className="flex-row items-center justify-between mb-2">
+            <Text
+              className="text-foreground text-base font-medium flex-1 mr-2 font-serif"
+              numberOfLines={1}
+            >
+              {entry.snapshot.name}
+            </Text>
+            <Text className="text-muted text-xs">
+              {timeText}{entry.meal ? ` · ${entry.meal.charAt(0).toUpperCase() + entry.meal.slice(1)}` : ''}
+            </Text>
+          </View>
 
-          {/* Content on top — not inside the shared container */}
-          <View style={{ padding: 14 }}>
-            {/* Top row: name + time/meal */}
-            <View className="flex-row items-center justify-between mb-2">
-              <Animated.Text
-                sharedTransitionTag={`food-name-${entry.id}`}
-                sharedTransitionStyle={SHARED_TRANSITION}
-                className="text-foreground text-base font-medium flex-1 mr-2 font-serif"
-                numberOfLines={1}
-              >
-                {entry.snapshot.name}
-              </Animated.Text>
-              <Animated.Text
-                sharedTransitionTag={`food-time-${entry.id}`}
-                sharedTransitionStyle={SHARED_TRANSITION}
-                className="text-muted text-xs"
-              >
-                {timeText}{entry.meal ? ` · ${entry.meal.charAt(0).toUpperCase() + entry.meal.slice(1)}` : ''}
-              </Animated.Text>
+          {/* Calories */}
+          <View className="flex-row items-end gap-1 mb-3">
+            <Text className="text-foreground text-2xl font-bold font-serif">
+              {scaled.calories}
+            </Text>
+            <Text className="text-muted text-sm mb-0.5">
+              kcal
+            </Text>
+          </View>
+
+          {/* Macro bar */}
+          <View style={{ flexDirection: 'row', height: 16, gap: 2, marginBottom: 12 }}>
+            <View
+              style={{ flex: macroPcts.protein, backgroundColor: MACRO_COLORS.protein, height: 16, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, borderTopRightRadius: 3, borderBottomRightRadius: 3 }}
+            />
+            <View
+              style={{ flex: macroPcts.carbs, backgroundColor: MACRO_COLORS.carbs, height: 16, borderRadius: 3 }}
+            />
+            <View
+              style={{ flex: macroPcts.fat, backgroundColor: MACRO_COLORS.fat, height: 16, borderTopLeftRadius: 3, borderBottomLeftRadius: 3, borderTopRightRadius: 6, borderBottomRightRadius: 6 }}
+            />
+          </View>
+
+          {/* Bottom row: macro chips */}
+          <View className="flex-row items-center gap-3">
+            <View className="flex-row items-center gap-1">
+              <View style={{ backgroundColor: MACRO_COLORS.protein, width: 7, height: 7, borderRadius: 4 }} />
+              <Text className="text-muted text-xs">{scaled.protein}g</Text>
             </View>
-
-            {/* Calories */}
-            <View className="flex-row items-end gap-1 mb-3">
-              <Animated.Text
-                sharedTransitionTag={`food-cal-${entry.id}`}
-                sharedTransitionStyle={SHARED_TRANSITION}
-                className="text-foreground text-2xl font-bold font-serif"
-              >
-                {scaled.calories}
-              </Animated.Text>
-              <Animated.Text
-                sharedTransitionTag={`food-kcal-${entry.id}`}
-                sharedTransitionStyle={SHARED_TRANSITION}
-                className="text-muted text-sm mb-0.5"
-              >
-                kcal
-              </Animated.Text>
+            <View className="flex-row items-center gap-1">
+              <View style={{ backgroundColor: MACRO_COLORS.carbs, width: 7, height: 7, borderRadius: 4 }} />
+              <Text className="text-muted text-xs">{scaled.carbs}g</Text>
             </View>
-
-            {/* Macro bar — each segment has its own shared tag */}
-            <View style={{ flexDirection: 'row', height: 16, gap: 2, marginBottom: 12 }}>
-              <Animated.View
-                sharedTransitionTag={`food-bar-protein-${entry.id}`}
-                sharedTransitionStyle={SHARED_TRANSITION}
-                style={{ flex: macroPcts.protein, backgroundColor: MACRO_COLORS.protein, height: 16, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, borderTopRightRadius: 3, borderBottomRightRadius: 3 }}
-              />
-              <Animated.View
-                sharedTransitionTag={`food-bar-carbs-${entry.id}`}
-                sharedTransitionStyle={SHARED_TRANSITION}
-                style={{ flex: macroPcts.carbs, backgroundColor: MACRO_COLORS.carbs, height: 16, borderRadius: 3 }}
-              />
-              <Animated.View
-                sharedTransitionTag={`food-bar-fat-${entry.id}`}
-                sharedTransitionStyle={SHARED_TRANSITION}
-                style={{ flex: macroPcts.fat, backgroundColor: MACRO_COLORS.fat, height: 16, borderTopLeftRadius: 3, borderBottomLeftRadius: 3, borderTopRightRadius: 6, borderBottomRightRadius: 6 }}
-              />
-            </View>
-
-            {/* Bottom row: macro chips */}
-            <View className="flex-row items-center gap-3">
-              <View className="flex-row items-center gap-1">
-                <Animated.View
-                  sharedTransitionTag={`food-protein-dot-${entry.id}`}
-                  sharedTransitionStyle={SHARED_TRANSITION}
-                  style={{ backgroundColor: MACRO_COLORS.protein, width: 7, height: 7, borderRadius: 4 }}
-                />
-                <Animated.Text
-                  sharedTransitionTag={`food-protein-${entry.id}`}
-                  sharedTransitionStyle={SHARED_TRANSITION}
-                  className="text-muted text-xs"
-                >
-                  {scaled.protein}g
-                </Animated.Text>
-              </View>
-              <View className="flex-row items-center gap-1">
-                <Animated.View
-                  sharedTransitionTag={`food-carbs-dot-${entry.id}`}
-                  sharedTransitionStyle={SHARED_TRANSITION}
-                  style={{ backgroundColor: MACRO_COLORS.carbs, width: 7, height: 7, borderRadius: 4 }}
-                />
-                <Animated.Text
-                  sharedTransitionTag={`food-carbs-${entry.id}`}
-                  sharedTransitionStyle={SHARED_TRANSITION}
-                  className="text-muted text-xs"
-                >
-                  {scaled.carbs}g
-                </Animated.Text>
-              </View>
-              <View className="flex-row items-center gap-1">
-                <Animated.View
-                  sharedTransitionTag={`food-fat-dot-${entry.id}`}
-                  sharedTransitionStyle={SHARED_TRANSITION}
-                  style={{ backgroundColor: MACRO_COLORS.fat, width: 7, height: 7, borderRadius: 4 }}
-                />
-                <Animated.Text
-                  sharedTransitionTag={`food-fat-${entry.id}`}
-                  sharedTransitionStyle={SHARED_TRANSITION}
-                  className="text-muted text-xs"
-                >
-                  {scaled.fat}g
-                </Animated.Text>
-              </View>
+            <View className="flex-row items-center gap-1">
+              <View style={{ backgroundColor: MACRO_COLORS.fat, width: 7, height: 7, borderRadius: 4 }} />
+              <Text className="text-muted text-xs">{scaled.fat}g</Text>
             </View>
           </View>
-        </View>
+        </GradientBorderCard>
       </Pressable>
     </Animated.View>
   )

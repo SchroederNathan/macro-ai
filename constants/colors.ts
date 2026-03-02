@@ -28,8 +28,8 @@ export const colors = {
     primaryBorder: '#fdba74',
     muted: '#a3a3a3',
     mutedForeground: '#404040',
-    card: '#2f2f2f',
-    border: '#404040',
+    card: '#171717',
+    border: '#1a1a1a',
     userBubble: '#ea580c',
     chat: '#343434',
     // Markdown specific
