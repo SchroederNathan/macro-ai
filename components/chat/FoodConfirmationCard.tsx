@@ -1,3 +1,5 @@
+import { MacroDetail } from '@/components/MacroDetail'
+import { MACRO_COLORS, SegmentedMacroBar } from '@/components/SegmentedMacroBar'
 import { AnimatedValue } from '@/components/ui/AnimatedValue'
 import { GradientBorderCard } from '@/components/ui/GradientBorderCard'
 import { Text } from '@/components/ui/Text'
@@ -13,19 +15,10 @@ import Animated, {
   FadeOut,
   FadeOutDown,
   LinearTransition,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
 } from 'react-native-reanimated'
 import { ShimmerText } from './ShimmerText'
 
 const entryLayoutTransition = LinearTransition.springify()
-
-const MACRO_COLORS = {
-  carbs: '#FBBF24',   // Yellow/amber
-  fat: '#3B82F6',     // Blue
-  protein: '#22C55E', // Green
-}
 
 // Re-export from canonical location
 export type { FoodConfirmationEntry } from '@/types/nutrition'
@@ -58,85 +51,6 @@ function formatServing(quantity: number, serving: { amount: number; unit: string
     return '1 serving'
   }
   return `${total} ${serving.unit}`
-}
-
-// Animated macro bar segment
-type MacroSegmentProps = {
-  percent: number
-  color: string
-  position: 'first' | 'middle' | 'last'
-}
-
-function MacroSegment({ percent, color, position }: MacroSegmentProps) {
-  const width = useSharedValue(0)
-
-  useEffect(() => {
-    width.set(withSpring(percent))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [percent])
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    flex: width.value,
-  }))
-
-  const borderRadius = position === 'first'
-    ? { borderTopLeftRadius: 8, borderBottomLeftRadius: 8, borderTopRightRadius: 4, borderBottomRightRadius: 4 }
-    : position === 'last'
-      ? { borderTopLeftRadius: 4, borderBottomLeftRadius: 4, borderTopRightRadius: 8, borderBottomRightRadius: 8 }
-      : { borderRadius: 4 }
-
-  return (
-    <Animated.View
-      style={[animatedStyle, { backgroundColor: color, height: 24, ...borderRadius }]}
-    />)
-}
-
-// Segmented macro bar component
-type SegmentedMacroBarProps = {
-  carbs: number
-  fat: number
-  protein: number
-}
-
-function SegmentedMacroBar({ carbs, fat, protein }: SegmentedMacroBarProps) {
-  const carbsCals = carbs * 4
-  const fatCals = fat * 9
-  const proteinCals = protein * 4
-  const totalMacroCals = carbsCals + fatCals + proteinCals
-
-  const carbsPercent = totalMacroCals > 0 ? (carbsCals / totalMacroCals) * 100 : 33
-  const fatPercent = totalMacroCals > 0 ? (fatCals / totalMacroCals) * 100 : 33
-  const proteinPercent = totalMacroCals > 0 ? (proteinCals / totalMacroCals) * 100 : 33
-
-  return (
-    <View style={{ flexDirection: 'row', height: 24, gap: 3 }}>
-      <MacroSegment percent={carbsPercent} color={MACRO_COLORS.carbs} position="first" />
-      <MacroSegment percent={fatPercent} color={MACRO_COLORS.fat} position="middle" />
-      <MacroSegment percent={proteinPercent} color={MACRO_COLORS.protein} position="last" />
-    </View>
-  )
-}
-
-// Macro detail item
-type MacroDetailProps = {
-  label: string
-  value: number
-  color: string
-}
-
-function MacroDetail({ label, value, color }: MacroDetailProps) {
-  return (
-    <View className="">
-      <View className="flex-row items-center gap-1.5 mb-0.5">
-        <View style={{ backgroundColor: color, width: 8, height: 8, borderRadius: 4 }} />
-        <Text className="text-muted text-sm">{label}</Text>
-      </View>
-      <View className="flex-row items-end gap-1">
-        <AnimatedValue value={value} className="text-foreground text-3xl font-semibold" />
-        <AnimatedValue value="g" className="text-muted text-xl mb-1.25" />
-      </View>
-    </View>
-  )
 }
 
 // Edit mode entry row
@@ -343,9 +257,10 @@ export function FoodConfirmationCard({
         {!isEmpty && (
           <Animated.View layout={entryLayoutTransition} className="mb-4">
             <SegmentedMacroBar
+              protein={totalProtein}
               carbs={totalCarbs}
               fat={totalFat}
-              protein={totalProtein}
+              animated
             />
           </Animated.View>
         )}
@@ -353,9 +268,9 @@ export function FoodConfirmationCard({
         {/* Macro Detail Row */}
         {!isEmpty && (
           <Animated.View layout={entryLayoutTransition} className="flex-row justify-between mb-8">
-            <MacroDetail label="Carbs" value={totalCarbs} color={MACRO_COLORS.carbs} />
-            <MacroDetail label="Fats" value={totalFat} color={MACRO_COLORS.fat} />
-            <MacroDetail label="Protein" value={totalProtein} color={MACRO_COLORS.protein} />
+            <MacroDetail label="Protein" value={totalProtein} color={MACRO_COLORS.protein} animated />
+            <MacroDetail label="Carbs" value={totalCarbs} color={MACRO_COLORS.carbs} animated />
+            <MacroDetail label="Fats" value={totalFat} color={MACRO_COLORS.fat} animated />
           </Animated.View>
         )}
 

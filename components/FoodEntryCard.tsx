@@ -1,3 +1,4 @@
+import { MACRO_COLORS, SegmentedMacroBar } from '@/components/SegmentedMacroBar'
 import { GradientBorderCard } from '@/components/ui/GradientBorderCard'
 import { Text } from '@/components/ui/Text'
 import { scaleMacros, type FoodLogEntry } from '@/types/nutrition'
@@ -10,12 +11,6 @@ import Animated, {
   FadeInUp,
   LinearTransition,
 } from 'react-native-reanimated'
-
-const MACRO_COLORS = {
-  protein: '#22C55E',
-  carbs: '#FBBF24',
-  fat: '#3B82F6',
-}
 
 const cardLayoutTransition = LinearTransition.springify()
 
@@ -31,18 +26,6 @@ const FoodEntryCard = memo(function FoodEntryCard({ entry, index }: FoodEntryCar
     () => scaleMacros(entry.snapshot.nutrients, entry.quantity),
     [entry.snapshot.nutrients, entry.quantity]
   )
-
-  const macroPcts = useMemo(() => {
-    const pCals = scaled.protein * 4
-    const cCals = scaled.carbs * 4
-    const fCals = scaled.fat * 9
-    const total = pCals + cCals + fCals
-    return {
-      protein: total > 0 ? (pCals / total) * 100 : 33,
-      carbs: total > 0 ? (cCals / total) * 100 : 33,
-      fat: total > 0 ? (fCals / total) * 100 : 33,
-    }
-  }, [scaled])
 
   const timeText = new Date(entry.consumedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
@@ -82,16 +65,8 @@ const FoodEntryCard = memo(function FoodEntryCard({ entry, index }: FoodEntryCar
           </View>
 
           {/* Macro bar */}
-          <View style={{ flexDirection: 'row', height: 16, gap: 2, marginBottom: 12 }}>
-            <View
-              style={{ flex: macroPcts.protein, backgroundColor: MACRO_COLORS.protein, height: 16, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, borderTopRightRadius: 3, borderBottomRightRadius: 3 }}
-            />
-            <View
-              style={{ flex: macroPcts.carbs, backgroundColor: MACRO_COLORS.carbs, height: 16, borderRadius: 3 }}
-            />
-            <View
-              style={{ flex: macroPcts.fat, backgroundColor: MACRO_COLORS.fat, height: 16, borderTopLeftRadius: 3, borderBottomLeftRadius: 3, borderTopRightRadius: 6, borderBottomRightRadius: 6 }}
-            />
+          <View style={{ marginBottom: 12 }}>
+            <SegmentedMacroBar protein={scaled.protein} carbs={scaled.carbs} fat={scaled.fat} height={16} gap={2} />
           </View>
 
           {/* Bottom row: macro chips */}

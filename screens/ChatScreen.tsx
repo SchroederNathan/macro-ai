@@ -156,7 +156,7 @@ export default function ChatScreen() {
     // Update tool activity state based on latest tool
     if (latestToolPart) {
       const partAny = latestToolPart as any
-      const foodQuery = partAny.input?.foodQuery || null
+      const foodQuery = partAny.input?.foodQuery || partAny.input?.foodName || null
       const newState = partAny.state
 
       setToolActivity({
@@ -179,8 +179,6 @@ export default function ChatScreen() {
       if (message.role !== 'assistant' || !message.parts) continue
 
       for (const part of message.parts) {
-        if (part.type !== 'tool-lookup_and_log_food') continue
-
         const partAny = part as any
         const toolCallId = partAny.toolCallId
         if (!toolCallId) continue
@@ -188,8 +186,10 @@ export default function ChatScreen() {
         // Skip if already processed
         if (processedToolCallsRef.current.has(toolCallId)) continue
 
-        // Check if this is a completed call with output
-        if (partAny.state === 'output-available' && partAny.output) {
+        // Only process completed tool calls
+        if (partAny.state !== 'output-available' || !partAny.output) continue
+
+        if (part.type === 'tool-lookup_and_log_food') {
           const result = partAny.output as {
             success?: boolean
             estimated?: boolean
@@ -204,10 +204,8 @@ export default function ChatScreen() {
           }
 
           if (result.success && result.entry) {
-            // Mark as processed to prevent duplicates
             processedToolCallsRef.current.add(toolCallId)
 
-            // Show card and append to pending entries for user confirmation
             setShowCard(true)
             setPendingEntries(prev => [...prev, {
               toolCallId,
@@ -224,13 +222,45 @@ export default function ChatScreen() {
 
             console.log('Food ready for confirmation:', result.entry.name, result.entry.nutrients.calories, 'cal')
           }
+        } else if (part.type === 'tool-remove_food_entry') {
+          const result = partAny.output as { success?: boolean; foodName?: string }
+
+          if (result.success && result.foodName) {
+            processedToolCallsRef.current.add(toolCallId)
+            const nameToRemove = result.foodName.toLowerCase()
+
+            setPendingEntries(prev => {
+              const idx = prev.findIndex(p => p.entry.name.toLowerCase() === nameToRemove)
+              if (idx === -1) return prev
+              const next = prev.filter((_, i) => i !== idx)
+              if (next.length === 0) setShowCard(false)
+              return next
+            })
+
+            console.log('Food removed from draft:', result.foodName)
+          }
+        } else if (part.type === 'tool-update_food_servings') {
+          const result = partAny.output as { success?: boolean; foodName?: string; newQuantity?: number }
+
+          if (result.success && result.foodName && result.newQuantity != null) {
+            processedToolCallsRef.current.add(toolCallId)
+            const nameToUpdate = result.foodName.toLowerCase()
+
+            setPendingEntries(prev => prev.map(p =>
+              p.entry.name.toLowerCase() === nameToUpdate
+                ? { ...p, entry: { ...p.entry, quantity: result.newQuantity! } }
+                : p
+            ))
+
+            console.log('Food servings updated:', result.foodName, 'to', result.newQuantity)
+          }
         }
       }
     }
   }, [messages])
 
   // Base bottom padding: input height + safe area + some margin
-  const cardVisible = showCard || pendingEntries.length > 0
+  const cardVisible = showCard
   const [cardHeight, setCardHeight] = useState(0)
   const baseBottomPadding = MIN_INPUT_HEIGHT + insets.bottom + 40 + cardHeight
 
@@ -317,10 +347,11 @@ export default function ChatScreen() {
       console.log('Food logged:', entry.snapshot.name, entry.snapshot.nutrients.calories, 'cal')
     }
 
-    setPendingEntries([])
     setShowCard(false)
     setMealTitle(null)
     setIsTitleLoading(false)
+    // Delay clearing entries so card exits with full content visible
+    setTimeout(() => setPendingEntries([]), 400)
 
     // Dismiss keyboard and swipe to Dashboard
     Keyboard.dismiss()
@@ -333,7 +364,11 @@ export default function ChatScreen() {
   // Handle removing a specific entry from the pending list
   const handleRemoveEntry = useCallback((index: number) => {
     Haptics.selection()
-    setPendingEntries(prev => prev.filter((_, i) => i !== index))
+    setPendingEntries(prev => {
+      const next = prev.filter((_, i) => i !== index)
+      if (next.length === 0) setShowCard(false)
+      return next
+    })
   }, [])
 
   // Handle quantity changes from edit mode

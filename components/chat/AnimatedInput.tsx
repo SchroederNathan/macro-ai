@@ -9,6 +9,7 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  Easing,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -44,7 +45,9 @@ const topContentExiting = (values: any) => {
   'worklet'
   return {
     initialValues: { transform: [{ translateY: 0 }] },
-    animations: { transform: [{ translateY: withSpring(values.currentHeight) }] },
+    animations: {
+      transform: [{ translateY: withTiming(values.currentHeight, { duration: 350, easing: Easing.out(Easing.cubic) }) }],
+    },
   }
 }
 

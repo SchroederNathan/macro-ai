@@ -1,3 +1,5 @@
+import { MacroDetail } from '@/components/MacroDetail'
+import { SegmentedMacroBar } from '@/components/SegmentedMacroBar'
 import { Text } from '@/components/ui/Text'
 import { useFoodDetailCallbacks } from '@/contexts/FoodDetailCallbackContext'
 import { useDailyLogStore } from '@/stores'
@@ -10,45 +12,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-
-const MACRO_COLORS = {
-  protein: '#22C55E',
-  carbs: '#FBBF24',
-  fat: '#3B82F6',
-}
-
-function MacroBar({ protein, carbs, fat }: { protein: number; carbs: number; fat: number }) {
-  const pCals = protein * 4
-  const cCals = carbs * 4
-  const fCals = fat * 9
-  const total = pCals + cCals + fCals
-  const pp = total > 0 ? (pCals / total) * 100 : 33
-  const cp = total > 0 ? (cCals / total) * 100 : 33
-  const fp = total > 0 ? (fCals / total) * 100 : 33
-
-  return (
-    <View style={{ flexDirection: 'row', height: 24, gap: 3 }}>
-      <View style={{ flex: pp, backgroundColor: MACRO_COLORS.protein, height: 24, borderTopLeftRadius: 8, borderBottomLeftRadius: 8, borderTopRightRadius: 4, borderBottomRightRadius: 4 }} />
-      <View style={{ flex: cp, backgroundColor: MACRO_COLORS.carbs, height: 24, borderRadius: 4 }} />
-      <View style={{ flex: fp, backgroundColor: MACRO_COLORS.fat, height: 24, borderTopLeftRadius: 4, borderBottomLeftRadius: 4, borderTopRightRadius: 8, borderBottomRightRadius: 8 }} />
-    </View>
-  )
-}
-
-function MacroDetail({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <View>
-      <View className="flex-row items-center gap-1.5 mb-0.5">
-        <View style={{ backgroundColor: color, width: 8, height: 8, borderRadius: 4 }} />
-        <Text className="text-muted text-sm">{label}</Text>
-      </View>
-      <View className="flex-row items-end gap-1">
-        <Text className="text-foreground text-3xl font-semibold">{value}</Text>
-        <Text className="text-muted text-xl mb-1.25">g</Text>
-      </View>
-    </View>
-  )
-}
 
 function PendingEntryRow({
   entry,
@@ -92,11 +55,8 @@ function PendingEntryRow({
   return (
     <GlassView
       isInteractive
-      style={{
-        borderRadius: 16,
-        borderCurve: 'continuous',
-        padding: 14,
-      }}
+      className="rounded-2xl p-3.5"
+      style={{ borderCurve: 'continuous' }}
     >
       <View className="flex-row items-center justify-between mb-2">
         <Text className="text-foreground text-base font-medium flex-1 mr-2" numberOfLines={1}>
@@ -114,29 +74,25 @@ function PendingEntryRow({
 
       <View className="flex-row items-center gap-3 mb-3">
         <View className="flex-row items-center gap-1">
-          <View style={{ backgroundColor: MACRO_COLORS.protein, width: 7, height: 7, borderRadius: 4 }} />
+          <View className="w-[7px] h-[7px] rounded-full bg-green-500" />
           <Text className="text-muted text-xs">{scaled.protein}g</Text>
         </View>
         <View className="flex-row items-center gap-1">
-          <View style={{ backgroundColor: MACRO_COLORS.carbs, width: 7, height: 7, borderRadius: 4 }} />
+          <View className="w-[7px] h-[7px] rounded-full bg-amber-400" />
           <Text className="text-muted text-xs">{scaled.carbs}g</Text>
         </View>
         <View className="flex-row items-center gap-1">
-          <View style={{ backgroundColor: MACRO_COLORS.fat, width: 7, height: 7, borderRadius: 4 }} />
+          <View className="w-[7px] h-[7px] rounded-full bg-blue-500" />
           <Text className="text-muted text-xs">{scaled.fat}g</Text>
         </View>
       </View>
 
-      <View
-        className="flex-row items-center justify-between pt-3"
-        style={{ borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
-      >
+      <View className="flex-row items-center justify-between pt-3 border-t border-black/[0.08] dark:border-white/10">
         <View className="flex-row items-center gap-3">
           <Pressable
             onPress={handleDecrement}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className="w-8 h-8 items-center justify-center rounded-full"
-            style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }}
+            className="w-8 h-8 items-center justify-center rounded-full bg-black/[0.06] dark:bg-white/10"
           >
             <Minus size={16} color={isDark ? '#fff' : '#000'} />
           </Pressable>
@@ -146,8 +102,7 @@ function PendingEntryRow({
           <Pressable
             onPress={handleIncrement}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className="w-8 h-8 items-center justify-center rounded-full"
-            style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }}
+            className="w-8 h-8 items-center justify-center rounded-full bg-black/[0.06] dark:bg-white/10"
           >
             <Plus size={16} color={isDark ? '#fff' : '#000'} />
           </Pressable>
@@ -156,8 +111,7 @@ function PendingEntryRow({
         <Pressable
           onPress={handleRemove}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          className="w-8 h-8 items-center justify-center rounded-full"
-          style={{ backgroundColor: 'rgba(239,68,68,0.15)' }}
+          className="w-8 h-8 items-center justify-center rounded-full bg-red-500/15"
         >
           <Trash2 size={16} color="#EF4444" />
         </Pressable>
@@ -260,7 +214,7 @@ export default function FoodDetailScreen() {
   }, [storeEntry, mode, params.entryId, router])
 
   return (
-    <View className="px-5" style={{ paddingTop: 4, paddingBottom: insets.bottom + 24 }}>
+    <View className="px-5 pt-8" style={{ paddingBottom: insets.bottom + 24 }}>
       {/* LOGGED MODE */}
       {mode === 'logged' && storeEntry && scaled && (
         <View>
@@ -283,13 +237,13 @@ export default function FoodDetailScreen() {
           </View>
 
           <View className="mb-4">
-            <MacroBar protein={scaled.protein} carbs={scaled.carbs} fat={scaled.fat} />
+            <SegmentedMacroBar protein={scaled.protein} carbs={scaled.carbs} fat={scaled.fat} />
           </View>
 
           <View className="flex-row justify-between mb-8">
             <View>
               <View className="flex-row items-center gap-1.5 mb-0.5">
-                <View style={{ backgroundColor: MACRO_COLORS.protein, width: 8, height: 8, borderRadius: 4 }} />
+                <View className="w-2 h-2 rounded-full bg-green-500" />
                 <Text className="text-muted text-sm">Protein</Text>
               </View>
               <Text className="text-foreground text-3xl font-semibold font-serif">
@@ -298,7 +252,7 @@ export default function FoodDetailScreen() {
             </View>
             <View>
               <View className="flex-row items-center gap-1.5 mb-0.5">
-                <View style={{ backgroundColor: MACRO_COLORS.carbs, width: 8, height: 8, borderRadius: 4 }} />
+                <View className="w-2 h-2 rounded-full bg-amber-400" />
                 <Text className="text-muted text-sm">Carbs</Text>
               </View>
               <Text className="text-foreground text-3xl font-semibold font-serif">
@@ -307,7 +261,7 @@ export default function FoodDetailScreen() {
             </View>
             <View>
               <View className="flex-row items-center gap-1.5 mb-0.5">
-                <View style={{ backgroundColor: MACRO_COLORS.fat, width: 8, height: 8, borderRadius: 4 }} />
+                <View className="w-2 h-2 rounded-full bg-blue-500" />
                 <Text className="text-muted text-sm">Fats</Text>
               </View>
               <Text className="text-foreground text-3xl font-semibold font-serif">
@@ -316,10 +270,7 @@ export default function FoodDetailScreen() {
             </View>
           </View>
 
-          <View
-            className="mb-6 pt-4"
-            style={{ borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
-          >
+          <View className="mb-6 pt-4 border-t border-black/[0.08] dark:border-white/10">
             <Text className="text-muted text-xs uppercase tracking-wider font-bold mb-2">Serving</Text>
             <Text className="text-foreground text-base">
               {storeEntry.snapshot.serving.amount * loggedQuantity} {storeEntry.snapshot.serving.unit}
@@ -327,16 +278,12 @@ export default function FoodDetailScreen() {
             </Text>
           </View>
 
-          <View
-            className="flex-row items-center justify-between pt-4"
-            style={{ borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
-          >
+          <View className="flex-row items-center justify-between pt-4 border-t border-black/[0.08] dark:border-white/10">
             <View className="flex-row items-center gap-4">
               <Pressable
                 onPress={handleLoggedDecrement}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                className="w-10 h-10 items-center justify-center rounded-full"
-                style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }}
+                className="w-10 h-10 items-center justify-center rounded-full bg-black/[0.06] dark:bg-white/10"
               >
                 <Minus size={18} color={isDark ? '#fff' : '#000'} />
               </Pressable>
@@ -346,8 +293,7 @@ export default function FoodDetailScreen() {
               <Pressable
                 onPress={handleLoggedIncrement}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                className="w-10 h-10 items-center justify-center rounded-full"
-                style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }}
+                className="w-10 h-10 items-center justify-center rounded-full bg-black/[0.06] dark:bg-white/10"
               >
                 <Plus size={18} color={isDark ? '#fff' : '#000'} />
               </Pressable>
@@ -356,8 +302,7 @@ export default function FoodDetailScreen() {
             <Pressable
               onPress={handleLoggedDelete}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              className="w-10 h-10 items-center justify-center rounded-full"
-              style={{ backgroundColor: 'rgba(239,68,68,0.15)' }}
+              className="w-10 h-10 items-center justify-center rounded-full bg-red-500/15"
             >
               <Trash2 size={18} color="#EF4444" />
             </Pressable>
@@ -368,7 +313,7 @@ export default function FoodDetailScreen() {
       {/* PENDING MODE */}
       {mode === 'pending' && pendingTotals && (
         <>
-          <View style={{ marginBottom: 16 }}>
+          <View className="mb-4">
             <Text className="text-foreground text-lg font-semibold mb-6">
               {pendingEntries.length} {pendingEntries.length === 1 ? 'item' : 'items'}
             </Text>
@@ -379,20 +324,20 @@ export default function FoodDetailScreen() {
             </View>
 
             <View className="mb-4">
-              <MacroBar protein={pendingTotals.protein} carbs={pendingTotals.carbs} fat={pendingTotals.fat} />
+              <SegmentedMacroBar protein={pendingTotals.protein} carbs={pendingTotals.carbs} fat={pendingTotals.fat} />
             </View>
 
             <View className="flex-row justify-between">
-              <MacroDetail label="Protein" value={pendingTotals.protein} color={MACRO_COLORS.protein} />
-              <MacroDetail label="Carbs" value={pendingTotals.carbs} color={MACRO_COLORS.carbs} />
-              <MacroDetail label="Fats" value={pendingTotals.fat} color={MACRO_COLORS.fat} />
+              <MacroDetail label="Protein" value={pendingTotals.protein} color="#22C55E" />
+              <MacroDetail label="Carbs" value={pendingTotals.carbs} color="#FBBF24" />
+              <MacroDetail label="Fats" value={pendingTotals.fat} color="#3B82F6" />
             </View>
           </View>
 
           <Text className="text-muted text-xs uppercase tracking-wider font-bold mb-3 ml-1">
             Items
           </Text>
-          <View style={{ gap: 10 }}>
+          <View className="gap-2.5">
             {pendingEntries.map((pendingEntry, index) => (
               <PendingEntryRow
                 key={`${pendingEntry.name}-${pendingEntry.fdcId ?? index}`}

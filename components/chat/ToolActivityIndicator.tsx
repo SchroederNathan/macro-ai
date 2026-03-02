@@ -40,6 +40,14 @@ function getDisplayText(
     return `Looking up ${foodQuery}...`
   }
 
+  if (toolName === 'tool-remove_food_entry' && foodQuery) {
+    return `Removing ${foodQuery}...`
+  }
+
+  if (toolName === 'tool-update_food_servings' && foodQuery) {
+    return `Updating ${foodQuery}...`
+  }
+
   if (toolName) {
     return 'Searching...'
   }

@@ -385,6 +385,38 @@ export async function POST(req: Request) {
           }
         },
       },
+      remove_food_entry: {
+        description: 'Remove a food item from the pending draft. Use when the user says "remove the X", "delete X", "take off the X", or "nevermind on the X".',
+        inputSchema: z.object({
+          foodName: z.string().describe('The exact display name of the food to remove (e.g., "Banana", "Grilled Chicken Breast")'),
+        }),
+        execute: async ({ foodName }) => {
+          console.log('[REMOVE] Removing:', foodName);
+          return {
+            success: true,
+            action: 'remove',
+            foodName,
+            message: `Removed ${foodName} from the draft.`,
+          };
+        },
+      },
+      update_food_servings: {
+        description: 'Update the quantity/servings of a food item in the pending draft. Use when the user says "I had 2, not 3", "change to 1 serving", "actually just 1", or any quantity correction.',
+        inputSchema: z.object({
+          foodName: z.string().describe('The exact display name of the food to update (e.g., "Banana", "Grilled Chicken Breast")'),
+          newQuantity: z.number().min(1).describe('The new number of servings'),
+        }),
+        execute: async ({ foodName, newQuantity }) => {
+          console.log('[UPDATE] Updating:', foodName, 'to', newQuantity, 'servings');
+          return {
+            success: true,
+            action: 'update_servings',
+            foodName,
+            newQuantity,
+            message: `Updated ${foodName} to ${newQuantity} serving${newQuantity !== 1 ? 's' : ''}.`,
+          };
+        },
+      },
     },
     system: `You are Miro, a friendly macro-tracking assistant.
 
@@ -400,9 +432,10 @@ IMPORTANT - Adding more food to the draft:
 - Example: You looked up "turkey sandwich", user says "and a big mac" → ONLY call tool for "big mac" (turkey sandwich is already in the card)
 
 CORRECTIONS:
-- If they say "actually it was X" or "no, I meant X" - they want to REPLACE. Call the tool for the new item only.
-- "remove the X" or "delete X" → Tell them to tap the X button on that item to remove it
-- "2 servings" or quantity changes → Call the tool again with the updated quantity
+- "remove the X", "delete X", "take off the X" → call remove_food_entry with the exact displayName from the original lookup
+- "I had 2, not 3", "actually just 1", "change to 2 servings" → call update_food_servings with the displayName and new quantity
+- "actually it was X, not Y" → call remove_food_entry for Y, then lookup_and_log_food for X
+- Always use the exact displayName you provided in the original lookup_and_log_food call
 
 Your estimates should be reasonable per-serving values. For example:
 - Medium banana: ~105 cal, 1g protein, 27g carbs, 0.4g fat, 3g fiber, 14g sugar
