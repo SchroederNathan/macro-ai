@@ -6,6 +6,7 @@ import Animated, {
   interpolate,
   runOnJS,
   type SharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -93,28 +94,37 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
 
   const shouldBeVisible = topContentVisible ?? !!topContent
 
-  useEffect(() => {
-    if (shouldBeVisible && (topContent || topContentRef.current)) {
-      if (!topContentMounted) {
-        isEnteringRef.current = true
-        topContentTranslateY.value = 1000 // start off-screen until onLayout measures
-        topContentOpacity.value = 1
-        setTopContentMounted(true)
-      }
-    } else if (!shouldBeVisible && topContentMounted) {
-      // Animate exit: slide down and fade out
-      topContentOpacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) })
-      topContentTranslateY.value = withTiming(
-        topContentHeightSV.value,
-        { duration: 350, easing: Easing.out(Easing.cubic) },
-        (finished) => {
-          if (finished) {
-            runOnJS(setTopContentMounted)(false)
+  // Shared value that mirrors shouldBeVisible — updated synchronously during render
+  // so the UI thread sees the change on the same frame React commits
+  const topContentVisibleSV = useSharedValue(shouldBeVisible)
+  topContentVisibleSV.value = shouldBeVisible
+
+  // Mount synchronously during render (enter path)
+  if (shouldBeVisible && (topContent || topContentRef.current) && !topContentMounted) {
+    isEnteringRef.current = true
+    topContentTranslateY.value = 1000 // start off-screen until onLayout measures
+    topContentOpacity.value = 1
+    setTopContentMounted(true)
+  }
+
+  // Exit animation — runs on UI thread immediately when shared value transitions true → false
+  useAnimatedReaction(
+    () => topContentVisibleSV.value,
+    (current, previous) => {
+      if (previous === true && current === false) {
+        topContentOpacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) })
+        topContentTranslateY.value = withTiming(
+          topContentHeightSV.value,
+          { duration: 350, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            if (finished) {
+              runOnJS(setTopContentMounted)(false)
+            }
           }
-        }
-      )
+        )
+      }
     }
-  }, [shouldBeVisible])
+  )
 
   // Reset refs when fully unmounted
   useEffect(() => {
@@ -230,7 +240,7 @@ export const AnimatedInput = forwardRef<AnimatedInputRef, AnimatedInputProps>(fu
     >
       {topContentMounted && (topContent || topContentRef.current) && (
         <Animated.View
-          style={[{ zIndex: -1, paddingHorizontal: 4 }, rTopContentStyle]}
+          style={[{ zIndex: -1, paddingHorizontal: 4, overflow: 'hidden' }, rTopContentStyle]}
           onLayout={handleTopContentLayout}
         >
           {topContent || topContentRef.current}

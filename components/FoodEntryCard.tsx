@@ -4,6 +4,7 @@ import { Text } from '@/components/ui/Text'
 import { scaleMacros, type FoodLogEntry } from '@/types/nutrition'
 
 import { useRouter } from 'expo-router'
+import { Beef, Droplet, Wheat } from 'lucide-react-native'
 import { memo, useCallback, useMemo } from 'react'
 import { Pressable, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -27,8 +28,6 @@ const FoodEntryCard = memo(function FoodEntryCard({ entry, index }: FoodEntryCar
     [entry.snapshot.nutrients, entry.quantity]
   )
 
-  const timeText = new Date(entry.consumedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-
   const handlePress = useCallback(() => {
     Haptics.selection()
     router.push({ pathname: '/(app)/food-detail', params: { mode: 'logged', entryId: entry.id } })
@@ -49,9 +48,11 @@ const FoodEntryCard = memo(function FoodEntryCard({ entry, index }: FoodEntryCar
             >
               {entry.snapshot.name}
             </Text>
-            <Text className="text-muted text-xs">
-              {timeText}{entry.meal ? ` · ${entry.meal.charAt(0).toUpperCase() + entry.meal.slice(1)}` : ''}
-            </Text>
+            {entry.meal ? (
+              <Text className="text-muted text-xs">
+                {entry.meal.charAt(0).toUpperCase() + entry.meal.slice(1)}
+              </Text>
+            ) : null}
           </View>
 
           {/* Calories */}
@@ -72,15 +73,15 @@ const FoodEntryCard = memo(function FoodEntryCard({ entry, index }: FoodEntryCar
           {/* Bottom row: macro chips */}
           <View className="flex-row items-center gap-3">
             <View className="flex-row items-center gap-1">
-              <View style={{ backgroundColor: MACRO_COLORS.protein, width: 7, height: 7, borderRadius: 4 }} />
+              <Beef size={12} color={MACRO_COLORS.protein} />
               <Text className="text-muted text-xs">{scaled.protein}g</Text>
             </View>
             <View className="flex-row items-center gap-1">
-              <View style={{ backgroundColor: MACRO_COLORS.carbs, width: 7, height: 7, borderRadius: 4 }} />
+              <Wheat size={12} color={MACRO_COLORS.carbs} />
               <Text className="text-muted text-xs">{scaled.carbs}g</Text>
             </View>
             <View className="flex-row items-center gap-1">
-              <View style={{ backgroundColor: MACRO_COLORS.fat, width: 7, height: 7, borderRadius: 4 }} />
+              <Droplet size={12} color={MACRO_COLORS.fat} />
               <Text className="text-muted text-xs">{scaled.fat}g</Text>
             </View>
           </View>

@@ -6,6 +6,9 @@ import { fetch as expoFetch } from 'expo/fetch'
 
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking'
 
+const RESTART_DELAY_MS = 100
+const BUSY_RETRY_DELAY_MS = 300
+
 type UseVoiceChatOptions = {
   onTranscript?: (text: string, isFinal: boolean) => void
   onSpeakingStart?: () => void
@@ -27,6 +30,9 @@ export function useVoiceChat({
   const sourceRef = useRef<any>(null)
   const isStoppingRef = useRef(false)
   const isSpeakingRef = useRef(false)
+
+  const voiceModeActiveRef = useRef(false)
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Stable callback refs
   const onTranscriptRef = useRef(onTranscript)
@@ -52,34 +58,102 @@ export function useVoiceChat({
     return audioContextRef.current
   }, [])
 
+  const clearRestartTimer = useCallback(() => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+      restartTimerRef.current = null
+    }
+  }, [])
+
+  // Start/restart the recognizer (internal)
+  const startRecognizer = useCallback(async () => {
+    try {
+      ExpoSpeechRecognitionModule.start({
+        lang: 'en-US',
+        interimResults: true,
+        continuous: false,
+        addsPunctuation: true,
+      })
+    } catch (error: any) {
+      if (error?.message?.includes('busy') || error?.code === 'busy') {
+        console.log('[VOICE] Recognizer busy, retrying in', BUSY_RETRY_DELAY_MS, 'ms')
+        restartTimerRef.current = setTimeout(() => {
+          if (voiceModeActiveRef.current) startRecognizer()
+        }, BUSY_RETRY_DELAY_MS)
+      } else {
+        throw error
+      }
+    }
+  }, [])
+
   // Set up STT event listeners
   useEffect(() => {
     const resultSub = ExpoSpeechRecognitionModule.addListener('result', (event) => {
       const transcript = event.results[0]?.transcript || ''
       const isFinal = event.isFinal
 
-      setInterimTranscript(isFinal ? '' : transcript)
-      onTranscriptRef.current?.(transcript, isFinal)
-
       if (isFinal) {
-        setState('processing')
+        // Send immediately — no debounce
+        console.log('[VOICE] Final result, sending:', transcript)
+        setInterimTranscript('')
+        setState(prev => prev === 'listening' ? 'processing' : prev)
+        onTranscriptRef.current?.(transcript, true)
+      } else {
+        // Show interim for visual feedback
+        setInterimTranscript(transcript)
       }
     })
 
     const errorSub = ExpoSpeechRecognitionModule.addListener('error', (event) => {
-      // no-speech / speech-timeout are normal — just go back to idle silently
-      if (event.error === 'no-speech' || event.error === 'speech-timeout') {
-        setState('idle')
+      if (event.error === 'aborted') {
         return
       }
+
+      if (event.error === 'busy') {
+        console.log('[VOICE] Recognizer busy on error event, retrying...')
+        restartTimerRef.current = setTimeout(() => {
+          if (voiceModeActiveRef.current) {
+            setState('listening')
+            startRecognizer()
+          }
+        }, BUSY_RETRY_DELAY_MS)
+        return
+      }
+
+      if (event.error === 'no-speech' || event.error === 'speech-timeout') {
+        if (voiceModeActiveRef.current) {
+          restartTimerRef.current = setTimeout(() => {
+            if (voiceModeActiveRef.current) {
+              startRecognizer()
+            }
+          }, RESTART_DELAY_MS)
+        } else {
+          setState('idle')
+        }
+        return
+      }
+
       console.warn('[VOICE] STT error:', event.error, event.message)
       onErrorRef.current?.(event.message || event.error)
       setState('idle')
     })
 
     const endSub = ExpoSpeechRecognitionModule.addListener('end', () => {
-      // Only transition to idle if we're still listening (not already processing/speaking)
-      setState(prev => prev === 'listening' ? 'idle' : prev)
+      if (voiceModeActiveRef.current) {
+        setState(prev => {
+          if (prev === 'listening' || prev === 'idle') {
+            restartTimerRef.current = setTimeout(() => {
+              if (voiceModeActiveRef.current) {
+                startRecognizer()
+              }
+            }, RESTART_DELAY_MS)
+            return 'listening'
+          }
+          return prev
+        })
+      } else {
+        setState(prev => prev === 'listening' ? 'idle' : prev)
+      }
     })
 
     return () => {
@@ -87,7 +161,7 @@ export function useVoiceChat({
       errorSub.remove()
       endSub.remove()
     }
-  }, [])
+  }, [startRecognizer])
 
   const startListening = useCallback(async () => {
     try {
@@ -98,31 +172,31 @@ export function useVoiceChat({
       }
 
       setInterimTranscript('')
+      clearRestartTimer()
       setState('listening')
 
-      ExpoSpeechRecognitionModule.start({
-        lang: 'en-US',
-        interimResults: true,
-        continuous: false,
-        addsPunctuation: true,
-      })
+      await startRecognizer()
     } catch (error) {
       console.error('[VOICE] Failed to start listening:', error)
       onErrorRef.current?.('Failed to start speech recognition')
       setState('idle')
     }
-  }, [])
+  }, [startRecognizer, clearRestartTimer])
 
   const stopListening = useCallback(() => {
+    clearRestartTimer()
     try {
       ExpoSpeechRecognitionModule.stop()
     } catch (error) {
       console.error('[VOICE] Failed to stop listening:', error)
     }
-  }, [])
+  }, [clearRestartTimer])
 
   const speak = useCallback(async (text: string) => {
     if (!text.trim()) return
+
+    // Stop recognizer before TTS to avoid picking up playback audio
+    try { ExpoSpeechRecognitionModule.abort() } catch {}
 
     // Stop any existing playback before starting new speech
     if (sourceRef.current) {
@@ -215,9 +289,17 @@ export function useVoiceChat({
     isStoppingRef.current = false
   }, [])
 
+  const setVoiceModeActive = useCallback((active: boolean) => {
+    voiceModeActiveRef.current = active
+    if (!active) {
+      clearRestartTimer()
+    }
+  }, [clearRestartTimer])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      clearRestartTimer()
       try {
         ExpoSpeechRecognitionModule.abort()
       } catch {}
@@ -228,7 +310,7 @@ export function useVoiceChat({
         try { audioContextRef.current.close() } catch {}
       }
     }
-  }, [])
+  }, [clearRestartTimer])
 
   return {
     state,
@@ -237,6 +319,7 @@ export function useVoiceChat({
     stopListening,
     speak,
     stopSpeaking,
+    setVoiceModeActive,
     analyserNode: analyserRef.current,
     setState,
   }

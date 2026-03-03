@@ -1,9 +1,13 @@
 import { streamText, UIMessage, convertToModelMessages, stepCountIs } from 'ai';
+import { createGateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
+import { fetch as expoFetch } from 'expo/fetch';
 import {
   type USDASearchResponse,
   type USDAFoodFull,
 } from '@/types/nutrition';
+
+const gateway = createGateway({ fetch: expoFetch as unknown as typeof globalThis.fetch });
 
 const USDA_API_KEY = process.env.USDA_API_KEY;
 const USDA_BASE_URL = 'https://api.nal.usda.gov/fdc/v1';
@@ -113,11 +117,24 @@ function enhanceQuery(query: string): string {
 
 
 export async function POST(req: Request) {
-  const { messages, voiceMode }: { messages: UIMessage[]; voiceMode?: boolean } = await req.json();
+  const { messages, voiceMode, foodHistory, userGoals, todayDateKey }: {
+    messages: UIMessage[];
+    voiceMode?: boolean;
+    foodHistory?: Array<{
+      date: string;
+      entries: Array<{ name: string; quantity: number; meal?: string; nutrients: { calories: number; protein: number; carbs: number; fat: number; fiber?: number; sugar?: number } }>;
+      totals: { calories: number; protein: number; carbs: number; fat: number; fiber?: number; sugar?: number };
+    }>;
+    userGoals?: { calories: number; protein: number; carbs: number; fat: number } | null;
+    todayDateKey?: string;
+  } = await req.json();
   console.log('[CHAT API] Received', messages.length, 'messages', voiceMode ? '(voice mode)' : '');
+  console.log('[CHAT API] foodHistory:', foodHistory?.length ?? 0, 'days, dates:', foodHistory?.map(d => d.date));
+  console.log('[CHAT API] userGoals:', userGoals);
+  console.log('[CHAT API] todayDateKey:', todayDateKey);
 
   const result = streamText({
-    model: "google/gemini-3-flash",
+    model: gateway("google/gemini-3-flash"),
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
     tools: {
@@ -419,6 +436,85 @@ export async function POST(req: Request) {
           };
         },
       },
+      get_food_history: {
+        description: 'Get the user\'s food log history. Use when the user asks about what they ate, their intake, progress, or trends.',
+        inputSchema: z.object({
+          period: z.enum(['today', 'yesterday', 'week', 'two_weeks']).describe('Time period to retrieve'),
+        }),
+        execute: async ({ period }) => {
+          const today = todayDateKey || new Date().toISOString().slice(0, 10);
+          const history = foodHistory || [];
+          console.log(`[GET_FOOD_HISTORY] period=${period}, today=${today}, history has ${history.length} days`);
+          console.log('[GET_FOOD_HISTORY] Available dates:', history.map(d => `${d.date} (${d.entries.length} entries, ${d.totals.calories} cal)`));
+
+          // Filter by period
+          let daysToInclude: number;
+          switch (period) {
+            case 'today': daysToInclude = 1; break;
+            case 'yesterday': daysToInclude = 2; break;
+            case 'week': daysToInclude = 7; break;
+            case 'two_weeks': daysToInclude = 14; break;
+          }
+
+          // History is sorted most recent first (today at index 0)
+          const filtered = period === 'yesterday'
+            ? history.filter(d => d.date !== today).slice(0, 1)
+            : history.slice(0, daysToInclude);
+
+          console.log(`[GET_FOOD_HISTORY] Filtered to ${filtered.length} days:`, filtered.map(d => d.date));
+
+          if (filtered.length === 0) {
+            console.log('[GET_FOOD_HISTORY] No data found for period:', period);
+            return { period, daysWithData: 0, message: `No food logged for ${period}.` };
+          }
+
+          // Compute aggregates
+          const aggregate = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 };
+          for (const day of filtered) {
+            console.log(`[GET_FOOD_HISTORY] Day ${day.date}: cal=${day.totals.calories} p=${day.totals.protein} c=${day.totals.carbs} f=${day.totals.fat}`);
+            aggregate.calories += day.totals.calories;
+            aggregate.protein += day.totals.protein;
+            aggregate.carbs += day.totals.carbs;
+            aggregate.fat += day.totals.fat;
+            aggregate.fiber += day.totals.fiber ?? 0;
+            aggregate.sugar += day.totals.sugar ?? 0;
+          }
+
+          const daysWithData = filtered.length;
+          const averages = {
+            calories: Math.round(aggregate.calories / daysWithData),
+            protein: Math.round(aggregate.protein / daysWithData * 10) / 10,
+            carbs: Math.round(aggregate.carbs / daysWithData * 10) / 10,
+            fat: Math.round(aggregate.fat / daysWithData * 10) / 10,
+            fiber: Math.round(aggregate.fiber / daysWithData * 10) / 10,
+            sugar: Math.round(aggregate.sugar / daysWithData * 10) / 10,
+          };
+
+          console.log('[GET_FOOD_HISTORY] Aggregate totals:', aggregate);
+          if (daysWithData > 1) console.log('[GET_FOOD_HISTORY] Daily averages:', averages);
+
+          return {
+            period,
+            daysWithData,
+            days: filtered,
+            totals: aggregate,
+            dailyAverages: daysWithData > 1 ? averages : undefined,
+          };
+        },
+      },
+      get_user_goals: {
+        description: 'Get the user\'s daily nutrition goals/targets. Use when comparing intake to goals or answering questions about targets.',
+        inputSchema: z.object({}),
+        execute: async () => {
+          const defaults = { calories: 2000, protein: 150, carbs: 200, fat: 65 };
+          const goals = userGoals || defaults;
+          console.log('[GET_USER_GOALS] Returning goals:', goals, 'isCustom:', !!userGoals);
+          return {
+            goals,
+            isCustom: !!userGoals,
+          };
+        },
+      },
       ask_user: {
         description: 'Ask the user a clarifying question when more information is needed to accurately look up food. Use when food is ambiguous (e.g., "sushi roll", "sandwich", "coffee").',
         inputSchema: z.object({
@@ -468,7 +564,14 @@ Your estimates should be reasonable per-serving values. For example:
 Keep responses short and friendly.${voiceMode ? '' : ` After the tool lookup, just ask for confirmation - don't repeat all the macros since they'll see them in the confirmation card.
 Example: "Found it! Does this look right?"`}
 
-If the user asks about their progress or totals, just say you've logged what they mentioned and they can check the home screen.${voiceMode ? `
+INSIGHTS & PROGRESS:
+- When the user asks about their intake, progress, totals, or trends, use get_food_history to retrieve their logs
+- When comparing intake to goals, also call get_user_goals to get their targets
+- Summarize insights conversationally — highlight what matters (e.g., "You're at 85% of your protein goal today!")
+- For multi-day queries, mention daily averages and trends
+- If no data is available, let them know and suggest logging some food first${voiceMode ? `
+
+VOICE MODE INSIGHTS — summarize key numbers verbally rather than reading every entry. Example: "This week you averaged about 1,800 calories and 120 grams of protein per day — that's a bit under your 150-gram protein target."` : ''}${voiceMode ? `
 
 VOICE MODE — The user is speaking to you hands-free and CANNOT see the screen.
 - After a food lookup, ALWAYS tell them the key nutritional info verbally: name, calories, protein, carbs, and fat. Example: "Got it — one California Roll, that's about 255 calories, 9g protein, 38g carbs, and 7g fat. Sound right?"

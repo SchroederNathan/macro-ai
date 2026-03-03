@@ -32,4 +32,13 @@ export const carouselRows: CarouselItem[][] = [
     { id: '3-5', emoji: '🥩', text: 'I had a steak for dinner' },
     { id: '3-6', emoji: '🍜', text: 'I ate chicken pho' },
   ],
+  // Row 4 - Insights & Progress
+  [
+    { id: '4-1', emoji: '💪', text: "How's my protein this week?" },
+    { id: '4-2', emoji: '🎯', text: 'Am I hitting my calorie goal?' },
+    { id: '4-3', emoji: '🥦', text: 'How much fiber did I have today?' },
+    { id: '4-4', emoji: '📋', text: 'What did I eat yesterday?' },
+    { id: '4-5', emoji: '📊', text: "How are my macros this week?" },
+    { id: '4-6', emoji: '🔥', text: "How many calories today so far?" },
+  ],
 ]

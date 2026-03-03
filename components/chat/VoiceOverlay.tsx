@@ -161,7 +161,7 @@ export function VoiceOverlay({
 
         {/* Center content */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-          {state === 'listening' && (
+          {(state === 'listening' || state === 'idle') && (
             <Animated.View entering={FadeIn.duration(300)} style={{ alignItems: 'center' }}>
               <PulsingMic color={primaryColor} />
               <View style={{ marginTop: 32, minHeight: 48 }}>
@@ -251,7 +251,7 @@ export function VoiceOverlay({
               letterSpacing: 1,
             }}
           >
-            {state === 'listening' ? 'Voice Mode' : state === 'processing' ? 'Processing' : 'Speaking'}
+            {(state === 'listening' || state === 'idle') ? 'Voice Mode' : state === 'processing' ? 'Processing' : 'Speaking'}
           </Text>
         </View>
       </Pressable>

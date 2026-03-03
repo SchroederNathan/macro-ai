@@ -4,8 +4,7 @@ import { AnimatedValue } from '@/components/ui/AnimatedValue'
 import { GradientBorderCard } from '@/components/ui/GradientBorderCard'
 import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
-import { useRouter } from 'expo-router'
-import { Minus, Plus, X } from 'lucide-react-native'
+import { ChevronDown, Minus, Plus, X } from 'lucide-react-native'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -14,7 +13,11 @@ import Animated, {
   FadeInUp,
   FadeOut,
   FadeOutDown,
+  interpolate,
   LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from 'react-native-reanimated'
 import { ShimmerText } from './ShimmerText'
 
@@ -145,17 +148,25 @@ export function FoodConfirmationCard({
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
   const theme = isDark ? colors.dark : colors.light
-  const [isEditMode, setIsEditMode] = useState(false)
-  const router = useRouter()
+  const [isExpanded, setIsExpanded] = useState(false)
+  const chevronRotation = useSharedValue(0)
 
   const isEmpty = entries.length === 0
   const meal = entries[0]?.meal || getDefaultMeal()
 
-  const handleNavigateToDetail = useCallback(() => {
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${interpolate(chevronRotation.value, [0, 1], [0, 180])}deg` }],
+  }))
+
+  const handleToggleExpand = useCallback(() => {
     if (isEmpty) return
     Haptics.selection()
-    router.push({ pathname: '/(app)/food-detail', params: { mode: 'pending', entries: JSON.stringify(entries) } })
-  }, [isEmpty, router, entries])
+    setIsExpanded((prev) => {
+      const next = !prev
+      chevronRotation.value = withSpring(next ? 1 : 0)
+      return next
+    })
+  }, [isEmpty, chevronRotation])
 
   // Calculate totals
   const { totalCalories, totalProtein, totalCarbs, totalFat } = useMemo(() => {
@@ -201,12 +212,13 @@ export function FoodConfirmationCard({
     onRemove(index)
   }, [onRemove])
 
-  // Exit edit mode when entries become empty
+  // Collapse when entries become empty
   useEffect(() => {
     if (entries.length === 0) {
-      setIsEditMode(false)
+      setIsExpanded(false)
+      chevronRotation.value = withSpring(0)
     }
-  }, [entries.length])
+  }, [entries.length, chevronRotation])
 
   return (
     <View className="mx-1 -mb-2">
@@ -214,8 +226,8 @@ export function FoodConfirmationCard({
         borderRadius={{ topLeft: 20, topRight: 20, bottomLeft: 0, bottomRight: 0 }}
         padding={{ padding: 16, paddingBottom: 24 }}
       >
-        {/* Header: Title + Edit */}
-        <Pressable onPress={handleNavigateToDetail}>
+        {/* Header: Title + Expand chevron */}
+        <Pressable onPress={handleToggleExpand}>
         <Animated.View layout={entryLayoutTransition} className="flex-row justify-between items-center mb-8">
           {isEmpty ? (
             <Text className="text-muted text-lg">Add food to continue...</Text>
@@ -237,7 +249,9 @@ export function FoodConfirmationCard({
             </View>
           )}
           {!isEmpty && (
-            <Text className="text-primary text-sm font-medium">Details</Text>
+            <Animated.View style={chevronStyle}>
+              <ChevronDown size={20} color={theme.primary} />
+            </Animated.View>
           )}
         </Animated.View>
         </Pressable>
@@ -274,8 +288,8 @@ export function FoodConfirmationCard({
           </Animated.View>
         )}
 
-        {/* Edit Mode: Entry List */}
-        {isEditMode && !isEmpty && (
+        {/* Expandable Entry List */}
+        {isExpanded && !isEmpty && (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}

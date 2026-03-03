@@ -3,6 +3,8 @@ import { VoiceOverlay } from '@/components/chat/VoiceOverlay'
 import { colors } from '@/constants/colors'
 import { useVoiceChat } from '@/hooks/useVoiceChat'
 import { generateAPIUrl } from '@/utils'
+import { getDailyLog, getUserGoals } from '@/lib/storage'
+import { formatDateKey } from '@/types/nutrition'
 import { useDailyLogStore, useUserStore } from '@/stores'
 import { FoodDetailCallbackRegistryContext, PagerNavigationContext } from '@/contexts/PagerContexts'
 import { useChat } from '@ai-sdk/react'
@@ -90,6 +92,7 @@ export default function ChatScreen() {
     allowFreeform?: boolean
     context?: string
   } | null>(null)
+  const [clarificationDismissing, setClarificationDismissing] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
   const [lastAssistantText, setLastAssistantText] = useState('')
   const prevMessageCountRef = useRef(0)
@@ -129,13 +132,53 @@ export default function ChatScreen() {
     transport: new DefaultChatTransport({
       fetch: expoFetch as unknown as typeof globalThis.fetch,
       api: generateAPIUrl('/api/chat'),
-      body: () => ({ voiceMode: voiceModeRef.current }),
+      body: () => {
+        const today = new Date()
+        const todayKey = formatDateKey(today)
+        console.log('[BODY] Building request body, todayDateKey:', todayKey)
+        const foodHistory = []
+        for (let i = 0; i < 14; i++) {
+          const d = new Date(today)
+          d.setDate(d.getDate() - i)
+          const dateKey = formatDateKey(d)
+          const log = getDailyLog(dateKey)
+          if (log && log.entries.length > 0) {
+            console.log(`[BODY] Found log for ${dateKey}: ${log.entries.length} entries, totals:`, log.totals)
+            foodHistory.push({
+              date: log.date,
+              entries: log.entries.map(e => ({
+                name: e.snapshot.name,
+                quantity: e.quantity,
+                meal: e.meal,
+                nutrients: e.snapshot.nutrients,
+              })),
+              totals: log.totals,
+            })
+          }
+        }
+        const goals = getUserGoals()
+        console.log(`[BODY] Sending ${foodHistory.length} days of history, userGoals:`, goals)
+        return {
+          voiceMode: voiceModeRef.current,
+          foodHistory,
+          userGoals: goals,
+          todayDateKey: todayKey,
+        }
+      },
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onError: error => {
       console.error(error, 'ERROR')
       setIsThinking(false)
       setToolActivity({ toolName: null, toolState: null, foodQuery: null })
+      // Recover voice mode — restart listening so it doesn't get stuck in processing
+      if (voiceModeRef.current) {
+        setTimeout(() => {
+          if (voiceModeRef.current) {
+            voiceStartListeningRef.current?.()
+          }
+        }, 500)
+      }
     },
     onFinish: ({ message }) => {
       setIsThinking(false)
@@ -158,6 +201,13 @@ export default function ChatScreen() {
           if (textParts) {
             setLastAssistantText(textParts)
             voiceSpeakRef.current?.(textParts)
+          } else {
+            // No speakable text (tool-only response) — restart listening
+            setTimeout(() => {
+              if (voiceModeRef.current) {
+                voiceStartListeningRef.current?.()
+              }
+            }, 300)
           }
         }
       }
@@ -220,12 +270,14 @@ export default function ChatScreen() {
     Keyboard.dismiss()
     setVoiceMode(true)
     voiceModeRef.current = true
+    voiceChat.setVoiceModeActive(true)
     voiceChat.startListening()
   }, [voiceChat])
 
   const exitVoiceMode = useCallback(() => {
     setVoiceMode(false)
     voiceModeRef.current = false
+    voiceChat.setVoiceModeActive(false)
     voiceChat.stopListening()
     voiceChat.stopSpeaking()
   }, [voiceChat])
@@ -473,6 +525,10 @@ export default function ChatScreen() {
     sendMessage({ text })
   }, [sendMessage])
 
+  const handleClarificationDismiss = useCallback(() => {
+    setClarificationDismissing(true)
+  }, [])
+
   const handleClarificationAnswer = useCallback((answer: string) => {
     if (!pendingClarification) return
     Haptics.selection()
@@ -483,6 +539,7 @@ export default function ChatScreen() {
       output: answer,
     })
     setPendingClarification(null)
+    setClarificationDismissing(false)
   }, [pendingClarification, addToolOutput])
 
   // Helper to get default meal based on time of day
@@ -671,6 +728,7 @@ export default function ChatScreen() {
               allowFreeform={pendingClarification.allowFreeform}
               context={pendingClarification.context}
               onSubmit={handleClarificationAnswer}
+              onDismiss={handleClarificationDismiss}
             />
           </View>
         ) : pendingEntries.length > 0 ? (
@@ -685,7 +743,7 @@ export default function ChatScreen() {
             />
           </View>
         ) : undefined}
-        topContentVisible={!!pendingClarification || cardVisible}
+        topContentVisible={(!!pendingClarification && !clarificationDismissing) || cardVisible}
         onVoicePress={enterVoiceMode}
       />
       <LinearGradient

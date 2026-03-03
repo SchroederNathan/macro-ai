@@ -7,7 +7,7 @@ import type { FoodConfirmationEntry } from '@/types/nutrition'
 import { scaleMacros } from '@/types/nutrition'
 import { GlassView } from 'expo-glass-effect'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Minus, Plus, Trash2 } from 'lucide-react-native'
+import { Beef, Droplet, Minus, Plus, Trash2, Wheat } from 'lucide-react-native'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -71,15 +71,15 @@ function PendingEntryRow({
 
       <View className="flex-row items-center gap-3 mb-3">
         <View className="flex-row items-center gap-1">
-          <View className="w-[7px] h-[7px] rounded-full bg-green-500" />
+          <Beef size={12} color="#22C55E" />
           <Text className="text-muted text-xs">{scaled.protein}g</Text>
         </View>
         <View className="flex-row items-center gap-1">
-          <View className="w-[7px] h-[7px] rounded-full bg-amber-400" />
+          <Wheat size={12} color="#FBBF24" />
           <Text className="text-muted text-xs">{scaled.carbs}g</Text>
         </View>
         <View className="flex-row items-center gap-1">
-          <View className="w-[7px] h-[7px] rounded-full bg-blue-500" />
+          <Droplet size={12} color="#3B82F6" />
           <Text className="text-muted text-xs">{scaled.fat}g</Text>
         </View>
       </View>
@@ -215,10 +215,11 @@ export default function FoodDetailScreen() {
             {storeEntry.snapshot.name}
           </Text>
 
-          <Text className="text-muted text-sm mb-6 font-serif">
-            {new Date(storeEntry.consumedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-            {storeEntry.meal ? ` · ${storeEntry.meal.charAt(0).toUpperCase() + storeEntry.meal.slice(1)}` : ''}
-          </Text>
+          {storeEntry.meal ? (
+            <Text className="text-muted text-sm mb-6 font-serif">
+              {storeEntry.meal.charAt(0).toUpperCase() + storeEntry.meal.slice(1)}
+            </Text>
+          ) : null}
 
           <View className="flex-row items-end gap-2 mb-6">
             <Text className="text-foreground text-5xl font-bold font-serif">
@@ -236,7 +237,7 @@ export default function FoodDetailScreen() {
           <View className="flex-row justify-between mb-8">
             <View>
               <View className="flex-row items-center gap-1.5 mb-0.5">
-                <View className="w-2 h-2 rounded-full bg-green-500" />
+                <Beef size={14} color="#22C55E" />
                 <Text className="text-muted text-sm">Protein</Text>
               </View>
               <Text className="text-foreground text-3xl font-semibold font-serif">
@@ -245,7 +246,7 @@ export default function FoodDetailScreen() {
             </View>
             <View>
               <View className="flex-row items-center gap-1.5 mb-0.5">
-                <View className="w-2 h-2 rounded-full bg-amber-400" />
+                <Wheat size={14} color="#FBBF24" />
                 <Text className="text-muted text-sm">Carbs</Text>
               </View>
               <Text className="text-foreground text-3xl font-semibold font-serif">
@@ -254,7 +255,7 @@ export default function FoodDetailScreen() {
             </View>
             <View>
               <View className="flex-row items-center gap-1.5 mb-0.5">
-                <View className="w-2 h-2 rounded-full bg-blue-500" />
+                <Droplet size={14} color="#3B82F6" />
                 <Text className="text-muted text-sm">Fats</Text>
               </View>
               <Text className="text-foreground text-3xl font-semibold font-serif">

@@ -13,6 +13,8 @@ type ClarificationCardProps = {
   allowFreeform?: boolean
   context?: string
   onSubmit: (answer: string) => void
+  /** Called immediately on selection, before the delayed onSubmit — use to start exit animation */
+  onDismiss?: () => void
 }
 
 const chipLayoutTransition = LinearTransition.springify()
@@ -23,6 +25,7 @@ export function ClarificationCard({
   allowFreeform = true,
   context,
   onSubmit,
+  onDismiss,
 }: ClarificationCardProps) {
   const colorScheme = useColorScheme()
   const isDark = colorScheme === 'dark'
@@ -33,17 +36,19 @@ export function ClarificationCard({
   const handleChipPress = useCallback((value: string) => {
     Haptics.selection()
     setSelectedValue(value)
-    // Auto-submit after brief visual feedback
+    onDismiss?.() // Start exit animation immediately
+    // Submit after brief visual feedback
     setTimeout(() => {
       onSubmit(value)
     }, 300)
-  }, [onSubmit])
+  }, [onSubmit, onDismiss])
 
   const handleFreeformSubmit = useCallback(() => {
     if (!freeformText.trim()) return
     Haptics.selection()
+    onDismiss?.() // Start exit animation immediately
     onSubmit(freeformText.trim())
-  }, [freeformText, onSubmit])
+  }, [freeformText, onSubmit, onDismiss])
 
   return (
     <View className="mx-1 -mb-2">
