@@ -1,4 +1,5 @@
-import { AnimatedInput, type AnimatedInputRef, ClarificationCard, EmptyStateCarousels, FoodConfirmationCard, type FoodConfirmationEntry, MessageBubble, MIN_INPUT_HEIGHT, ToolActivityIndicator } from '@/components/chat'
+import { AnimatedInput, type AnimatedInputRef, ClarificationCard, EmptyStateCarousels, FoodConfirmationCard, type FoodConfirmationEntry, MessageBubble, MIN_INPUT_HEIGHT } from '@/components/chat'
+import { ThinkingDropdown } from '@/components/chat/ThinkingDropdown'
 import { VoiceOverlay } from '@/components/chat/VoiceOverlay'
 import { useVoiceChat } from '@/hooks/useVoiceChat'
 import { generateAPIUrl } from '@/utils'
@@ -17,9 +18,11 @@ import { Keyboard, Pressable, useWindowDimensions, View } from 'react-native'
 import { Text } from '@/components/ui/Text'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import type { SharedValue } from 'react-native-reanimated'
-import Animated, { SlideInUp, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import Animated, { LinearTransition, SlideInUp, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AudioGradientOrb } from '@/components/chat/AudioGradientOrb'
+
+const listItemTransition = LinearTransition.springify()
 
 /** Generate a creative meal title from food names */
 async function generateMealTitle(foodNames: string[]): Promise<string | null> {
@@ -72,6 +75,7 @@ type ToolActivity = {
 export default function ChatScreen() {
   const [input, setInput] = useState('')
   const [isThinking, setIsThinking] = useState(false)
+  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
   const [toolActivity, setToolActivity] = useState<ToolActivity>({
     toolName: null,
     toolState: null,
@@ -95,7 +99,7 @@ export default function ChatScreen() {
   const [voiceMode, setVoiceMode] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [lastAssistantText, setLastAssistantText] = useState('')
-  const prevMessageCountRef = useRef(0)
+
   const processedToolCallsRef = useRef<Set<string>>(new Set())
   const voiceModeRef = useRef(false)
   const voiceSpeakRef = useRef<(text: string) => Promise<void>>()
@@ -104,7 +108,7 @@ export default function ChatScreen() {
   const addToolOutputRef = useRef<typeof addToolOutput>(null as any)
   const spokenToolCallsRef = useRef<Set<string>>(new Set())
   const voiceModeWhenSentRef = useRef(false)
-  const listRef = useRef<FlashListRef<UIMessage>>(null)
+  const listRef = useRef<FlashListRef<any>>(null)
   const inputRef = useRef<AnimatedInputRef>(null)
   const insets = useSafeAreaInsets()
   const headerHeight = insets.top + 44
@@ -181,7 +185,14 @@ export default function ChatScreen() {
       }
     },
     onFinish: ({ message }) => {
-      setIsThinking(false)
+      // Don't clear isThinking if there's an unanswered ask_user — the user
+      // still needs to respond and thinking should persist until then.
+      const hasUnansweredAskUser = message.parts?.some(
+        (p: any) => p.type === 'tool-ask_user' && p.state !== 'output-available'
+      )
+      if (!hasUnansweredAskUser) {
+        setIsThinking(false)
+      }
       // Clear tool activity after a short delay to show completion state
       setTimeout(() => {
         setToolActivity({ toolName: null, toolState: null, foodQuery: null })
@@ -224,6 +235,7 @@ export default function ChatScreen() {
         const clarification = pendingClarificationRef.current
         if (clarification) {
           setIsThinking(true)
+          setThinkingStartTime(Date.now())
           voiceModeWhenSentRef.current = true
           addToolOutputRef.current?.({
             tool: 'ask_user',
@@ -233,6 +245,7 @@ export default function ChatScreen() {
           setPendingClarification(null)
         } else {
           setIsThinking(true)
+          setThinkingStartTime(Date.now())
           voiceModeWhenSentRef.current = true
           setToolActivity({ toolName: null, toolState: null, foodQuery: null })
           sendMessage({ text })
@@ -355,7 +368,7 @@ export default function ChatScreen() {
     // Update tool activity state based on latest tool
     if (latestToolPart) {
       const partAny = latestToolPart as any
-      const foodQuery = partAny.input?.foodQuery || partAny.input?.foodName || null
+      const foodQuery = partAny.input?.foodQuery || partAny.input?.foodName || partAny.input?.question || null
       const newState = partAny.state
 
       setToolActivity({
@@ -516,22 +529,6 @@ export default function ChatScreen() {
   }, [])
 
 
-  // Track when assistant responds with actual TEXT content (not just tool activity)
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1]
-    if (lastMessage?.role === 'assistant' && lastMessage.parts) {
-      // Check if there's any text content in the message
-      const hasTextContent = lastMessage.parts.some(
-        (part: any) => part.type === 'text' && part.text?.trim()
-      )
-      if (hasTextContent) {
-        setIsThinking(false)
-        setToolActivity({ toolName: null, toolState: null, foodQuery: null })
-      }
-    }
-    prevMessageCountRef.current = messages.length
-  }, [messages])
-
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0) {
@@ -545,6 +542,7 @@ export default function ChatScreen() {
   const handleSend = useCallback(() => {
     if (!input.trim()) return
     setIsThinking(true)
+    setThinkingStartTime(Date.now())
     setToolActivity({ toolName: null, toolState: null, foodQuery: null })
     sendMessage({ text: input })
     // Scroll to bottom after sending
@@ -555,6 +553,7 @@ export default function ChatScreen() {
 
   const handleCarouselSelect = useCallback((text: string) => {
     setIsThinking(true)
+    setThinkingStartTime(Date.now())
     setToolActivity({ toolName: null, toolState: null, foodQuery: null })
     sendMessage({ text })
   }, [sendMessage])
@@ -567,6 +566,7 @@ export default function ChatScreen() {
     if (!pendingClarification) return
     Haptics.selection()
     setIsThinking(true)
+    setThinkingStartTime(Date.now())
     addToolOutput({
       tool: 'ask_user',
       toolCallId: pendingClarification.toolCallId,
@@ -681,28 +681,46 @@ export default function ChatScreen() {
     }
   }, [pendingEntries])
 
-  // Show activity indicator while thinking or tool is active
-  const showActivityIndicator = isThinking || toolActivity.toolName !== null
+  // Build list data: messages + a thinking sentinel inserted after the last user message.
+  // Always insert the sentinel when messages exist — ThinkingDropdown handles its own
+  // visibility internally (returns null when not needed). This avoids unmount/remount
+  // cycles that would lose accumulated step state.
+  type ListItem =
+    | { type: 'message'; message: UIMessage }
+    | { type: 'thinking' }
+
+  const listData = useMemo<ListItem[]>(() => {
+    if (messages.length === 0) {
+      return []
+    }
+
+    // Find the last user message index
+    let lastUserIdx = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+
+    const items: ListItem[] = []
+    for (let i = 0; i < messages.length; i++) {
+      items.push({ type: 'message', message: messages[i] })
+      if (i === lastUserIdx) {
+        items.push({ type: 'thinking' })
+      }
+    }
+    // If no user message found (edge case), append at end
+    if (lastUserIdx === -1) {
+      items.push({ type: 'thinking' })
+    }
+    return items
+  }, [messages])
 
   // Footer component with keyboard-aware spacer
   const ListFooter = useMemo(() => (
-    <>
-      {/* Tool activity indicator - inline with messages */}
-      {showActivityIndicator && (
-        <View className="px-4 py-2">
-          <ToolActivityIndicator
-            isThinking={isThinking}
-            toolName={toolActivity.toolName}
-            toolState={toolActivity.toolState}
-            foodQuery={toolActivity.foodQuery || undefined}
-          />
-        </View>
-      )}
-
-      {/* Spacer that grows with keyboard to keep content above it */}
-      <KeyboardSpacer keyboardHeight={keyboardHeight} baseHeight={baseBottomPadding} />
-    </>
-  ), [showActivityIndicator, toolActivity, keyboardHeight, baseBottomPadding, isThinking])
+    <KeyboardSpacer keyboardHeight={keyboardHeight} baseHeight={baseBottomPadding} />
+  ), [keyboardHeight, baseBottomPadding])
 
   // Scroll to bottom when card becomes visible
   useEffect(() => {
@@ -716,9 +734,26 @@ export default function ChatScreen() {
     }
   }, [cardVisible, scrollToBottom])
 
-  const renderItem = useCallback(({ item }: { item: UIMessage }) => (
-    <MessageBubble message={item} />
-  ), [])
+  const renderItem = useCallback(({ item }: { item: ListItem }) => {
+    if (item.type === 'thinking') {
+      return (
+        <Animated.View layout={listItemTransition} className="px-4 py-2">
+          <ThinkingDropdown
+            isThinking={isThinking}
+            thinkingStartTime={thinkingStartTime}
+            toolName={toolActivity.toolName}
+            toolState={toolActivity.toolState}
+            foodQuery={toolActivity.foodQuery || undefined}
+          />
+        </Animated.View>
+      )
+    }
+    return (
+      <Animated.View layout={listItemTransition}>
+        <MessageBubble message={item.message} />
+      </Animated.View>
+    )
+  }, [isThinking, thinkingStartTime, toolActivity])
 
   if (error) return <Text>{error.message}</Text>
 
@@ -758,11 +793,13 @@ export default function ChatScreen() {
           )}
           <FlashList
             ref={listRef}
-            data={messages}
+            data={listData}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
             renderItem={renderItem}
+            getItemType={(item: any) => item.type}
+            estimatedItemSize={60}
             contentContainerStyle={{
               paddingTop: headerHeight + 8,
             }}

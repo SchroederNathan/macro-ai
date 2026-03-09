@@ -37,15 +37,15 @@ function getDisplayText(
   }
 
   if (toolName === 'tool-lookup_and_log_food' && foodQuery) {
-    return `Looking up ${foodQuery}...`
+    return `${foodQuery}...`
   }
 
   if (toolName === 'tool-remove_food_entry' && foodQuery) {
-    return `Removing ${foodQuery}...`
+    return `${foodQuery}...`
   }
 
   if (toolName === 'tool-update_food_servings' && foodQuery) {
-    return `Updating ${foodQuery}...`
+    return `${foodQuery}...`
   }
 
   if (toolName === 'tool-ask_user') {
@@ -232,7 +232,7 @@ export function ToolActivityIndicator({ isThinking, toolName, toolState, foodQue
         {/* Base color layer */}
         <View
           style={{ width: dimensions.width || 200, height: dimensions.height || 24 }}
-          className="bg-muted"
+          className="bg-muted/50"
         />
         {/* Shimmer overlay */}
         {!isComplete && dimensions.width > 0 && (
