@@ -19,6 +19,10 @@ export const STORAGE_KEYS = {
   userGoals: 'user:goals',
   /** Chat messages */
   chatMessages: 'chat:messages',
+  /** Water log (today's intake) */
+  waterLog: 'water:log',
+  /** Water unit preference */
+  waterUnit: 'water:unit',
 } as const;
 
 // ============================================
@@ -118,4 +122,44 @@ export function clearChatMessages(): void {
  */
 export function clearAllData(): void {
   storage.clearAll();
+}
+
+// ============================================
+// Water Tracking
+// ============================================
+
+export type WaterLog = {
+  date: string;    // yyyy-mm-dd
+  amountMl: number;
+  goalMl: number;
+};
+
+export type WaterUnit = 'ml' | 'oz' | 'cups';
+
+/**
+ * Get today's water log
+ */
+export function getWaterLog(): WaterLog | null {
+  return getJSON<WaterLog>(STORAGE_KEYS.waterLog);
+}
+
+/**
+ * Save today's water log
+ */
+export function saveWaterLog(log: WaterLog): void {
+  setJSON(STORAGE_KEYS.waterLog, log);
+}
+
+/**
+ * Get water unit preference
+ */
+export function getWaterUnit(): WaterUnit | null {
+  return getJSON<WaterUnit>(STORAGE_KEYS.waterUnit);
+}
+
+/**
+ * Save water unit preference
+ */
+export function saveWaterUnit(unit: WaterUnit): void {
+  setJSON(STORAGE_KEYS.waterUnit, unit);
 }

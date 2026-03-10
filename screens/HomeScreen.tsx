@@ -2,8 +2,9 @@ import CalorieTracker from "@/components/CalorieTracker"
 import DatePicker from "@/components/DatePicker"
 import { FoodHistory } from "@/components/FoodEntryCard"
 import MacroProgress from "@/components/MacroProgress"
+import WaterTracker from "@/components/WaterTracker"
 import { colors } from "@/constants/colors"
-import { useDailyLogStore, useUserStore } from "@/stores"
+import { useDailyLogStore, useUserStore, useWaterStore } from "@/stores"
 import { useRouter } from "expo-router"
 import { Plus, Settings } from "lucide-react-native"
 import { useCallback, useEffect } from "react"
@@ -31,12 +32,14 @@ export default function HomeScreen() {
     const fatGoal = useUserStore(state => state.goals.fat)
     const entries = useDailyLogStore(state => state.log.entries)
     const loadUserGoals = useUserStore(state => state.load)
+    const loadWater = useWaterStore(state => state.load)
 
-    // Load stores on mount
+    // Load stores on mount (water load handles midnight auto-reset)
     useEffect(() => {
         loadDailyLog()
         loadUserGoals()
-    }, [loadDailyLog, loadUserGoals])
+        loadWater()
+    }, [loadDailyLog, loadUserGoals, loadWater])
 
     // Debug
     useEffect(() => {
@@ -102,6 +105,7 @@ export default function HomeScreen() {
                     fat={fat}
                     fatGoal={fatGoal}
                 />
+                <WaterTracker />
                 <View className="px-4 mt-6 pb-4">
                     <FoodHistory entries={entries} />
                     {/* <WeeklyCalorieChart calorieGoal={targetCalories} /> */}
