@@ -19,6 +19,8 @@ export const STORAGE_KEYS = {
   userGoals: 'user:goals',
   /** Chat messages */
   chatMessages: 'chat:messages',
+  /** Streak data */
+  streak: 'streak:data',
 } as const;
 
 // ============================================
@@ -56,7 +58,7 @@ export function removeKey(key: string): void {
 /**
  * Get all keys matching a prefix
  */
-function getKeysWithPrefix(prefix: string): string[] {
+export function getKeysWithPrefix(prefix: string): string[] {
   return storage.getAllKeys().filter(key => key.startsWith(prefix));
 }
 
@@ -111,6 +113,29 @@ export function saveChatMessages(messages: UIMessage[]): void {
  */
 export function clearChatMessages(): void {
   removeKey(STORAGE_KEYS.chatMessages);
+}
+
+/**
+ * Streak data shape
+ */
+export type StreakData = {
+  currentStreak: number;
+  bestStreak: number;
+  lastLoggedDate: string; // yyyy-mm-dd
+};
+
+/**
+ * Get streak data
+ */
+export function getStreakData(): StreakData | null {
+  return getJSON<StreakData>(STORAGE_KEYS.streak);
+}
+
+/**
+ * Save streak data
+ */
+export function saveStreakData(data: StreakData): void {
+  setJSON(STORAGE_KEYS.streak, data);
 }
 
 /**

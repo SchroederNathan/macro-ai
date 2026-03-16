@@ -1,63 +1,16 @@
-import { ScrollPositionContext } from '@/contexts/PagerContexts'
 import { Text } from '@/components/ui/Text'
 import { colors } from '@/constants/colors'
 import { getDailyLog } from '@/lib/storage'
 import { formatDateKey } from '@/types/nutrition'
-import {
-  Canvas,
-  Circle,
-  DashPathEffect,
-  Group,
-  LinearGradient,
-  Path,
-  Skia,
-  vec,
-} from '@shopify/react-native-skia'
-import { GlassView } from 'expo-glass-effect'
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { View, useColorScheme, useWindowDimensions } from 'react-native'
-import {
-  Easing,
-  type SharedValue,
-  runOnJS,
-  useAnimatedReaction,
-  useDerivedValue,
-  useSharedValue,
-  withDelay,
-  withTiming,
-} from 'react-native-reanimated'
+import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg'
 
-const CHART_HEIGHT = 160
-const PAD = { top: 20, right: 16, bottom: 4, left: 16 }
-const DOT_R = 4
+const CHART_HEIGHT = 200
+const BAR_RADIUS = 6
+const PAD = { top: 28, right: 12, bottom: 32, left: 12 }
 
-function smoothPath(pts: { x: number; y: number }[]) {
-  const p = Skia.Path.Make()
-  if (pts.length === 0) return p
-  p.moveTo(pts[0].x, pts[0].y)
-  for (let i = 1; i < pts.length; i++) {
-    const mx = (pts[i - 1].x + pts[i].x) / 2
-    p.cubicTo(mx, pts[i - 1].y, mx, pts[i].y, pts[i].x, pts[i].y)
-  }
-  return p
-}
-
-function Dot({
-  cx, cy, color, index, total, progress,
-}: {
-  cx: number; cy: number; color: string
-  index: number; total: number; progress: SharedValue<number>
-}) {
-  const opacity = useDerivedValue(() => {
-    const t = index / Math.max(total - 1, 1)
-    return Math.min(1, Math.max(0, (progress.value - t + 0.08) / 0.08))
-  })
-  return (
-    <Group opacity={opacity}>
-      <Circle cx={cx} cy={cy} r={DOT_R} color={color} />
-    </Group>
-  )
-}
+type DayData = { day: string; cal: number; date: Date }
 
 type Props = { calorieGoal: number }
 
@@ -65,16 +18,16 @@ export default function WeeklyCalorieChart({ calorieGoal }: Props) {
   const { width: screenWidth } = useWindowDimensions()
   const colorScheme = useColorScheme()
   const theme = colors[colorScheme ?? 'light']
-  const scrollPosition = useContext(ScrollPositionContext)
+  const isDark = colorScheme === 'dark'
 
-  const chartW = screenWidth - 64
+  const chartW = screenWidth - 48
   const drawW = chartW - PAD.left - PAD.right
   const drawH = CHART_HEIGHT - PAD.top - PAD.bottom
 
-  const [data, setData] = useState<{ day: string; cal: number }[]>([])
+  const [data, setData] = useState<DayData[]>([])
 
   useEffect(() => {
-    const out: { day: string; cal: number }[] = []
+    const out: DayData[] = []
     const today = new Date()
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today)
@@ -83,172 +36,134 @@ export default function WeeklyCalorieChart({ calorieGoal }: Props) {
       out.push({
         day: d.toLocaleDateString('en-US', { weekday: 'short' }),
         cal: log?.totals.calories ?? 0,
+        date: d,
       })
     }
     setData(out)
   }, [])
 
-  const { pts, avgPts } = useMemo(() => {
-    if (data.length === 0) return { pts: [], avgPts: [], goalY: 0 }
-    const ceil = Math.max(...data.map(d => d.cal), calorieGoal) * 1.15 || 1
+  const daysLogged = useMemo(() => data.filter(d => d.cal > 0).length, [data])
 
-    const pts = data.map((d, i) => ({
-      x: PAD.left + (i / 6) * drawW,
-      y: PAD.top + drawH - (d.cal / ceil) * drawH,
-    }))
-
-    const avgPts = data.map((_, i) => {
-      const slice = data.slice(Math.max(0, i - 2), i + 1)
-      const avg = slice.reduce((s, w) => s + w.cal, 0) / slice.length
-      return {
-        x: PAD.left + (i / 6) * drawW,
-        y: PAD.top + drawH - (avg / ceil) * drawH,
-      }
-    })
-
-    return { pts, avgPts, goalY: PAD.top + drawH - (calorieGoal / ceil) * drawH }
-  }, [data, calorieGoal, drawW, drawH])
-
-  const mainPath = useMemo(() => smoothPath(pts), [pts])
-  const rollingPath = useMemo(() => smoothPath(avgPts), [avgPts])
-
-  // Linear goal trend: cumulative goal vs cumulative actual over 7 days
-  // Shows a line from day 1's goal to day 7's goal (calorieGoal * 1 → calorieGoal * 7)
-  const { goalTrendPath, goalEndY } = useMemo(() => {
-    if (data.length === 0) return { goalTrendPath: Skia.Path.Make(), goalStartY: 0, goalEndY: 0 }
-    const ceil = Math.max(...data.map(d => d.cal), calorieGoal) * 1.15 || 1
-    const startY = PAD.top + drawH - (calorieGoal / ceil) * drawH
-    const endY = startY // flat reference line — same daily target each day
-    const p = Skia.Path.Make()
-    p.moveTo(PAD.left, startY)
-    p.lineTo(chartW - PAD.right, endY)
-    return { goalTrendPath: p, goalStartY: startY, goalEndY: endY }
-  }, [data, calorieGoal, drawH, chartW])
-
-  // Animation
-  const progress = useSharedValue(0)
-  const shimmerPos = useSharedValue(0)
-  const fired = useRef(false)
-
-  const fire = useCallback(() => {
-    if (fired.current) return
-    fired.current = true
-    // Line draws in over 1400ms
-    progress.value = withTiming(1, { duration: 1400, easing: Easing.out(Easing.cubic) })
-    // Shimmer starts 250ms later, runs faster (1150ms), finishes at same time
-    shimmerPos.value = withDelay(250, withTiming(1, { duration: 1150, easing: Easing.out(Easing.cubic) }))
-  }, [progress, shimmerPos])
-
-  useAnimatedReaction(
-    () => scrollPosition?.value ?? 1,
-    (v) => { if (v < 0.1) runOnJS(fire)() },
-  )
-
-  const end = useDerivedValue(() => progress.value)
-
-  // Shimmer: a bright band that sweeps across the line
-  const SHIMMER_BAND = 40
-  const shimmerGradStart = useDerivedValue(() => {
-    const x = PAD.left + shimmerPos.value * drawW - SHIMMER_BAND
-    return vec(x, 0)
-  })
-  const shimmerGradEnd = useDerivedValue(() => {
-    const x = PAD.left + shimmerPos.value * drawW + SHIMMER_BAND
-    return vec(x, 0)
-  })
-  const shimmerOpacity = useDerivedValue(() => {
-    const p = shimmerPos.value
-    if (p <= 0) return 0
-    if (p < 0.1) return (p / 0.1) * 0.8   // fade in
-    if (p > 0.85) return ((1 - p) / 0.15) * 0.8 // fade out at end
-    return 0.8
-  })
-
-  const lineCol = theme.primary
-  const avgCol = colorScheme === 'dark' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)'
-  const goalCol = colorScheme === 'dark' ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.4)'
+  const maxCal = useMemo(() => {
+    const highest = Math.max(...data.map(d => d.cal), calorieGoal)
+    return highest * 1.15 || 1
+  }, [data, calorieGoal])
 
   if (data.length === 0) return null
 
+  const barGap = 10
+  const barWidth = (drawW - barGap * (data.length - 1)) / data.length
+  const goalY = PAD.top + drawH - (calorieGoal / maxCal) * drawH
+
   return (
-    <View className="mt-6">
-      <Text className="text-muted text-xs uppercase tracking-wider font-bold mb-3">
-        Weekly Trend
-      </Text>
-      <GlassView isInteractive style={{ borderRadius: 16, borderCurve: 'continuous' as any, padding: 16 }}>
-        <View style={{ height: CHART_HEIGHT }}>
-          <Canvas className="flex-1">
-            {/* Goal reference line */}
-            <Path path={goalTrendPath} style="stroke" strokeWidth={1} color={goalCol}>
-              <DashPathEffect intervals={[6, 4]} />
-            </Path>
+    <View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <Text style={{ color: theme.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
+          Weekly Calories
+        </Text>
+        <Text style={{ color: theme.muted, fontSize: 11 }}>
+          {daysLogged}/7 days logged
+        </Text>
+      </View>
 
-            {/* Daily calories line */}
-            <Path
-              path={mainPath}
-              style="stroke"
-              strokeWidth={2.5}
-              color={lineCol}
-              start={0}
-              end={end}
-              strokeCap="round"
-              strokeJoin="round"
-            />
-
-            {/* Shimmer sweep — bright band that races across the line */}
-            <Group opacity={shimmerOpacity}>
-              <Path
-                path={mainPath}
-                style="stroke"
-                strokeWidth={4}
-                start={0}
-                end={end}
-                strokeCap="round"
-                strokeJoin="round"
-              >
-                <LinearGradient
-                  start={shimmerGradStart}
-                  end={shimmerGradEnd}
-                  colors={['transparent', 'rgba(255,255,255,0.7)', 'transparent']}
-                />
-              </Path>
-            </Group>
-
-            {/* Rolling average */}
-            <Path
-              path={rollingPath}
-              style="stroke"
-              strokeWidth={1.5}
-              color={avgCol}
-              start={0}
-              end={end}
-              strokeCap="round"
-              strokeJoin="round"
-            >
-              <DashPathEffect intervals={[4, 3]} />
-            </Path>
-
-            {/* Data dots */}
-            {pts.map((pt, i) => (
-              <Dot key={`dot-${pt.x}-${pt.y}`} cx={pt.x} cy={pt.y} color={lineCol} index={i} total={pts.length} progress={progress} />
-            ))}
-          </Canvas>
+      <View style={{
+        backgroundColor: isDark ? '#141414' : '#ffffff',
+        borderRadius: 16,
+        borderCurve: 'continuous' as any,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: isDark ? '#222' : '#e4e4e7',
+      }}>
+        <Svg width={chartW} height={CHART_HEIGHT}>
+          {/* Goal dashed line */}
+          <Line
+            x1={PAD.left}
+            y1={goalY}
+            x2={chartW - PAD.right}
+            y2={goalY}
+            stroke={isDark ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.4)'}
+            strokeWidth={1.5}
+            strokeDasharray="6,4"
+          />
 
           {/* Goal label */}
-          <View className="absolute" style={{ right: PAD.right + 4, top: goalEndY - 14 }}>
-            <Text className="text-[10px] font-semibold" style={{ color: goalCol }}>Goal</Text>
-          </View>
-        </View>
+          <SvgText
+            x={chartW - PAD.right}
+            y={goalY - 6}
+            textAnchor="end"
+            fontSize={9}
+            fontWeight="600"
+            fill={isDark ? 'rgba(239,68,68,0.6)' : 'rgba(239,68,68,0.5)'}
+          >
+            Goal {calorieGoal}
+          </SvgText>
 
-        {/* X-axis labels */}
-        <View className="flex-row justify-between mt-1" style={{ paddingHorizontal: PAD.left }}>
-          {data.map((d) => (
-            <Text key={d.day} className="text-muted text-[10px] text-center w-[30px]">
-              {d.day}
-            </Text>
-          ))}
-        </View>
-      </GlassView>
+          {/* Bars */}
+          {data.map((d, i) => {
+            const barH = d.cal > 0 ? Math.max((d.cal / maxCal) * drawH, 4) : 0
+            const x = PAD.left + i * (barWidth + barGap)
+            const y = PAD.top + drawH - barH
+            const isOver = d.cal > calorieGoal
+            const barColor = d.cal === 0
+              ? (isDark ? '#222' : '#e4e4e7')
+              : isOver ? '#ef4444' : '#22c55e'
+
+            return (
+              <Rect
+                key={`bar-${i}`}
+                x={x}
+                y={y}
+                width={barWidth}
+                height={barH || 2}
+                rx={BAR_RADIUS}
+                ry={BAR_RADIUS}
+                fill={barColor}
+                opacity={d.cal === 0 ? 0.4 : 0.85}
+              />
+            )
+          })}
+
+          {/* Calorie labels above bars */}
+          {data.map((d, i) => {
+            const barH = d.cal > 0 ? Math.max((d.cal / maxCal) * drawH, 4) : 0
+            const x = PAD.left + i * (barWidth + barGap) + barWidth / 2
+            const y = PAD.top + drawH - barH - 6
+
+            if (d.cal === 0) return null
+
+            return (
+              <SvgText
+                key={`label-${i}`}
+                x={x}
+                y={y}
+                textAnchor="middle"
+                fontSize={9}
+                fontWeight="600"
+                fill={isDark ? '#a3a3a3' : '#71717a'}
+              >
+                {d.cal}
+              </SvgText>
+            )
+          })}
+
+          {/* Day labels at bottom */}
+          {data.map((d, i) => {
+            const x = PAD.left + i * (barWidth + barGap) + barWidth / 2
+            return (
+              <SvgText
+                key={`day-${i}`}
+                x={x}
+                y={CHART_HEIGHT - 8}
+                textAnchor="middle"
+                fontSize={10}
+                fill={isDark ? '#666' : '#a1a1aa'}
+              >
+                {d.day}
+              </SvgText>
+            )
+          })}
+        </Svg>
+      </View>
     </View>
   )
 }
