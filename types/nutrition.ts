@@ -42,6 +42,22 @@ export type FoodLogEntry = {
   mealTitle?: string;
 };
 
+export type FavoriteTemplateEntry = {
+  quantity: number;
+  snapshot: FoodSnapshot;
+  meal?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+};
+
+export type FavoriteTemplate = {
+  id: string;
+  key: string;
+  type: 'item' | 'meal';
+  title: string;
+  mealTitle?: string;
+  createdAt: number;
+  entries: FavoriteTemplateEntry[];
+};
+
 /** Pending food entry awaiting user confirmation in chat */
 export type FoodConfirmationEntry = {
   name: string;

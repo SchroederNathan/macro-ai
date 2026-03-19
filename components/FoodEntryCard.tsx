@@ -1,10 +1,12 @@
 import { MACRO_COLORS, SegmentedMacroBar } from '@/components/SegmentedMacroBar'
 import { GradientBorderCard } from '@/components/ui/GradientBorderCard'
 import { Text } from '@/components/ui/Text'
+import { useFavoritesStore } from '@/stores'
+import { buildFavoriteKey, entriesFromLoggedFood } from '@/stores/favoritesStore'
 import { scaleMacros, sumMacros, type FoodLogEntry } from '@/types/nutrition'
 
 import { useRouter } from 'expo-router'
-import { Beef, Droplet, Wheat } from 'lucide-react-native'
+import { Beef, Droplet, Star, Wheat } from 'lucide-react-native'
 import { memo, useCallback, useMemo } from 'react'
 import { Pressable, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -75,9 +77,10 @@ export function groupEntriesIntoMeals(entries: FoodLogEntry[]): MealGroup[] {
 type MealCardProps = {
   group: MealGroup
   index: number
+  isFavorite?: boolean
 }
 
-const MealCard = memo(function MealCard({ group, index }: MealCardProps) {
+const MealCard = memo(function MealCard({ group, index, isFavorite }: MealCardProps) {
   const router = useRouter()
   const isMeal = group.entries.length > 1
 
@@ -121,6 +124,9 @@ const MealCard = memo(function MealCard({ group, index }: MealCardProps) {
               {title}
             </Text>
             <View className="flex-row items-center gap-2">
+              {isFavorite ? (
+                <Star size={12} color="#F59E0B" fill="#F59E0B" />
+              ) : null}
               {isMeal ? (
                 <View className="bg-black/[0.06] dark:bg-white/10 rounded-full px-2 py-0.5">
                   <Text className="text-muted text-xs">{group.entries.length} items</Text>
@@ -180,6 +186,21 @@ type FoodHistoryProps = {
 
 export function FoodHistory({ entries }: FoodHistoryProps) {
   const mealGroups = useMemo(() => groupEntriesIntoMeals(entries), [entries])
+  const favorites = useFavoritesStore(s => s.favorites)
+
+  const favoriteKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const fav of favorites) {
+      keys.add(fav.key)
+    }
+    return keys
+  }, [favorites])
+
+  const isFavoriteGroup = useCallback((group: MealGroup): boolean => {
+    const templateEntries = entriesFromLoggedFood(group.entries)
+    const key = buildFavoriteKey(templateEntries, group.mealTitle)
+    return favoriteKeys.has(key)
+  }, [favoriteKeys])
 
   if (entries.length === 0) {
     return (
@@ -200,6 +221,7 @@ export function FoodHistory({ entries }: FoodHistoryProps) {
             key={group.key}
             group={group}
             index={index}
+            isFavorite={isFavoriteGroup(group)}
           />
         ))}
       </View>

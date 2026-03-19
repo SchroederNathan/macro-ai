@@ -1,5 +1,5 @@
 import { createMMKV } from 'react-native-mmkv';
-import type { DailyLog, UserGoals } from '@/types/nutrition';
+import type { DailyLog, FavoriteTemplate, UserGoals } from '@/types/nutrition';
 import type { UIMessage } from 'ai';
 
 // ============================================
@@ -19,6 +19,8 @@ export const STORAGE_KEYS = {
   userGoals: 'user:goals',
   /** Chat messages */
   chatMessages: 'chat:messages',
+  /** Saved quick-add favorites */
+  favorites: 'user:favorites',
 } as const;
 
 // ============================================
@@ -104,6 +106,20 @@ export function getChatMessages(): UIMessage[] | null {
  */
 export function saveChatMessages(messages: UIMessage[]): void {
   setJSON(STORAGE_KEYS.chatMessages, messages);
+}
+
+/**
+ * Get saved favorites
+ */
+export function getFavorites(): FavoriteTemplate[] {
+  return getJSON<FavoriteTemplate[]>(STORAGE_KEYS.favorites) ?? [];
+}
+
+/**
+ * Save favorites
+ */
+export function saveFavorites(favorites: FavoriteTemplate[]): void {
+  setJSON(STORAGE_KEYS.favorites, favorites);
 }
 
 /**

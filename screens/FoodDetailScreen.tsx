@@ -2,13 +2,14 @@ import { MacroDetail } from '@/components/MacroDetail'
 import { SegmentedMacroBar } from '@/components/SegmentedMacroBar'
 import { Text } from '@/components/ui/Text'
 import { useFoodDetailCallbacks } from '@/contexts/FoodDetailCallbackContext'
-import { useDailyLogStore } from '@/stores'
+import { useDailyLogStore, useFavoritesStore } from '@/stores'
+import { entriesFromLoggedFood } from '@/stores/favoritesStore'
 import { useShallow } from 'zustand/react/shallow'
 import type { FoodConfirmationEntry, FoodLogEntry } from '@/types/nutrition'
 import { scaleMacros, sumMacros } from '@/types/nutrition'
 import { GlassView } from 'expo-glass-effect'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Beef, Droplet, Minus, Plus, Trash2, Wheat } from 'lucide-react-native'
+import { Beef, Droplet, Minus, Plus, Star, Trash2, Wheat } from 'lucide-react-native'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, useColorScheme, View } from 'react-native'
 import { Haptics } from 'react-native-nitro-haptics'
@@ -175,6 +176,9 @@ export default function FoodDetailScreen() {
   const updateEntry = useDailyLogStore(s => s.updateEntry)
   const removeEntry = useDailyLogStore(s => s.removeEntry)
   const removeMeal = useDailyLogStore(s => s.removeMeal)
+  const toggleFavorite = useFavoritesStore(s => s.toggleFavorite)
+  const findFavoriteId = useFavoritesStore(s => s.findFavoriteId)
+  const loadFavorites = useFavoritesStore(s => s.load)
 
   const pendingEntries: FoodConfirmationEntry[] = useMemo(() => {
     if (mode !== 'pending' || !params.entries) return []
@@ -198,6 +202,26 @@ export default function FoodDetailScreen() {
   ))
 
   const mealTitle = mealEntries.length > 0 ? mealEntries[0].mealTitle : undefined
+
+  const loggedFavoriteEntries = useMemo(
+    () => (storeEntry ? entriesFromLoggedFood([storeEntry]) : []),
+    [storeEntry]
+  )
+
+  const mealFavoriteEntries = useMemo(
+    () => entriesFromLoggedFood(mealEntries),
+    [mealEntries]
+  )
+
+  const loggedFavoriteId = useMemo(
+    () => (loggedFavoriteEntries.length > 0 ? findFavoriteId(loggedFavoriteEntries, storeEntry?.mealTitle) : null),
+    [findFavoriteId, loggedFavoriteEntries, storeEntry?.mealTitle]
+  )
+
+  const mealFavoriteId = useMemo(
+    () => (mealFavoriteEntries.length > 0 ? findFavoriteId(mealFavoriteEntries, mealTitle) : null),
+    [findFavoriteId, mealFavoriteEntries, mealTitle]
+  )
 
   const mealTotals = useMemo(() => {
     if (mode !== 'meal' || mealEntries.length === 0) return null
@@ -267,6 +291,24 @@ export default function FoodDetailScreen() {
   }, [callbacks])
 
   useEffect(() => {
+    loadFavorites()
+  }, [loadFavorites])
+
+  const handleLoggedFavoriteToggle = useCallback(() => {
+    if (!storeEntry) return
+    Haptics.selection()
+    const next = toggleFavorite(loggedFavoriteEntries, storeEntry.mealTitle)
+    Haptics.notification(next.isFavorite ? 'success' : 'warning')
+  }, [storeEntry, toggleFavorite, loggedFavoriteEntries])
+
+  const handleMealFavoriteToggle = useCallback(() => {
+    if (mealFavoriteEntries.length === 0) return
+    Haptics.selection()
+    const next = toggleFavorite(mealFavoriteEntries, mealTitle)
+    Haptics.notification(next.isFavorite ? 'success' : 'warning')
+  }, [mealFavoriteEntries, mealTitle, toggleFavorite])
+
+  useEffect(() => {
     if (mode === 'logged' && params.entryId && !storeEntry) {
       if (router.canGoBack()) router.back()
     }
@@ -285,10 +327,20 @@ export default function FoodDetailScreen() {
           </Text>
 
           {storeEntry.meal ? (
-            <Text className="text-muted text-sm mb-6 font-serif">
+            <Text className="text-muted text-sm mb-3 font-serif">
               {storeEntry.meal.charAt(0).toUpperCase() + storeEntry.meal.slice(1)}
             </Text>
           ) : null}
+
+          <Pressable
+            onPress={handleLoggedFavoriteToggle}
+            className="self-start flex-row items-center gap-2 px-4 py-2 rounded-full bg-black/[0.06] dark:bg-white/10 mb-6"
+          >
+            <Star size={16} color={loggedFavoriteId ? '#F59E0B' : isDark ? '#fff' : '#000'} fill={loggedFavoriteId ? '#F59E0B' : 'transparent'} />
+            <Text className="text-foreground text-sm font-medium">
+              {loggedFavoriteId ? 'Saved to favorites' : 'Save to favorites'}
+            </Text>
+          </Pressable>
 
           <View className="flex-row items-end gap-2 mb-6">
             <Text className="text-foreground text-5xl font-bold font-serif">
@@ -380,10 +432,20 @@ export default function FoodDetailScreen() {
             <Text className="text-foreground text-2xl font-semibold mb-1 font-serif">
               {mealTitle ?? 'Meal'}
             </Text>
-            <Text className="text-muted text-sm mb-6 font-serif">
+            <Text className="text-muted text-sm mb-3 font-serif">
               {mealEntries.length} {mealEntries.length === 1 ? 'item' : 'items'}
               {mealEntries[0].meal ? ` · ${mealEntries[0].meal.charAt(0).toUpperCase() + mealEntries[0].meal.slice(1)}` : ''}
             </Text>
+
+            <Pressable
+              onPress={handleMealFavoriteToggle}
+              className="self-start flex-row items-center gap-2 px-4 py-2 rounded-full bg-black/[0.06] dark:bg-white/10 mb-6"
+            >
+              <Star size={16} color={mealFavoriteId ? '#F59E0B' : isDark ? '#fff' : '#000'} fill={mealFavoriteId ? '#F59E0B' : 'transparent'} />
+              <Text className="text-foreground text-sm font-medium">
+                {mealFavoriteId ? 'Saved to favorites' : 'Save meal to favorites'}
+              </Text>
+            </Pressable>
 
             <View className="flex-row items-end gap-2 mb-6">
               <Text className="text-foreground text-5xl font-bold font-serif">{mealTotals.calories}</Text>

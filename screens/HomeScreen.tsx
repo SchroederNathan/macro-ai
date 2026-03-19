@@ -1,11 +1,15 @@
 import CalorieTracker from "@/components/CalorieTracker"
 import DatePicker from "@/components/DatePicker"
+import { FavoritesQuickAdd } from "@/components/FavoritesQuickAdd"
 import { FoodHistory } from "@/components/FoodEntryCard"
 import MacroProgress from "@/components/MacroProgress"
 import WeeklyCalorieChart from "@/components/WeeklyCalorieChart"
-import { useDailyLogStore, useUserStore } from "@/stores"
+import { useDailyLogStore, useFavoritesStore, useUserStore } from "@/stores"
+import type { FavoriteTemplate } from "@/types/nutrition"
 import { useCallback, useEffect } from "react"
-import { ScrollView, View } from "react-native"
+import { View } from "react-native"
+import { ScrollView } from "react-native"
+import { Haptics } from 'react-native-nitro-haptics'
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 export default function HomeScreen() {
@@ -25,12 +29,18 @@ export default function HomeScreen() {
     const fatGoal = useUserStore(state => state.goals.fat)
     const entries = useDailyLogStore(state => state.log.entries)
     const loadUserGoals = useUserStore(state => state.load)
+    const favorites = useFavoritesStore(state => state.favorites)
+    const loadFavorites = useFavoritesStore(state => state.load)
+    const removeFavorite = useFavoritesStore(state => state.removeFavorite)
+    const addEntry = useDailyLogStore(state => state.addEntry)
+    const addMeal = useDailyLogStore(state => state.addMeal)
 
     // Load stores on mount
     useEffect(() => {
         loadDailyLog()
         loadUserGoals()
-    }, [loadDailyLog, loadUserGoals])
+        loadFavorites()
+    }, [loadDailyLog, loadUserGoals, loadFavorites])
 
     // Debug
     useEffect(() => {
@@ -40,6 +50,20 @@ export default function HomeScreen() {
     const handleDateSelect = useCallback((date: string) => {
         loadDailyLog(date)
     }, [loadDailyLog])
+
+    const handleQuickAddFavorite = useCallback((favorite: FavoriteTemplate) => {
+        if (favorite.type === 'meal' || favorite.entries.length > 1) {
+            addMeal(favorite.entries, favorite.mealTitle)
+        } else {
+            const [entry] = favorite.entries
+            addEntry(entry)
+        }
+        Haptics.notification('success')
+    }, [addEntry, addMeal])
+
+    const handleRemoveFavorite = useCallback((favorite: FavoriteTemplate) => {
+        removeFavorite(favorite.id)
+    }, [removeFavorite])
 
     return (
         <View className="flex-1">
@@ -67,6 +91,11 @@ export default function HomeScreen() {
                     fatGoal={fatGoal}
                 />
                 <View className="px-4 mt-6 pb-4">
+                    <FavoritesQuickAdd
+                        favorites={favorites}
+                        onQuickAdd={handleQuickAddFavorite}
+                        onRemove={handleRemoveFavorite}
+                    />
                     <FoodHistory entries={entries} />
                     {/* <WeeklyCalorieChart calorieGoal={targetCalories} /> */}
                 </View>
