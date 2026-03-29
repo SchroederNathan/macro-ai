@@ -1,37 +1,63 @@
 {
   "expo": {
-    "name": "Mora",
+    "name": "Mora - Calorie Tracker",
     "slug": "mora",
     "scheme": "mora",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icons/ios-light.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icons/splash-icon-light.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "icon": {
+        "light": "./assets/icons/ios-light.png",
+        "dark": "./assets/icons/ios-dark.png",
+        "tinted": "./assets/icons/ios-tinted.png"
+      },
+      "splash": {
+        "image": "./assets/icons/splash-icon-light.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./assets/icons/splash-icon-dark.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      },
       "supportsTablet": true,
       "bundleIdentifier": "com.schroedernathan.mora",
       "infoPlist": {
-        "NSSpeechRecognitionUsageDescription": "Allow macro-ai to use speech recognition for voice food logging.",
+        "NSSpeechRecognitionUsageDescription": "Allow Mora to use speech recognition for voice food logging.",
         "NSMicrophoneUsageDescription": "Allow Mora to use your microphone for voice food logging.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow Mora to access your photo library to attach food photos."
       }
     },
     "android": {
+      "icon": "./assets/icons/ios-light.png",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icons/adaptive-icon.png"
       },
-      "edgeToEdgeEnabled": true,
+      "splash": {
+        "image": "./assets/icons/splash-icon-light.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./assets/icons/splash-icon-dark.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      },
       "package": "com.schroedernathan.mora",
       "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.RECORD_AUDIO",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
@@ -70,10 +96,18 @@
         }
       ]
     ],
+    "owner": "schroedernathan",
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "9627be65-1f65-442f-9e88-01ddf5c0b976"
+        "projectId": "0ebd281d-28ed-45f7-bc02-a804c4a3e937"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0ebd281d-28ed-45f7-bc02-a804c4a3e937"
     }
   }
 }
